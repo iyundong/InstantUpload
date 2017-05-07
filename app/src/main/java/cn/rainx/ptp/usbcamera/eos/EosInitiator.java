@@ -516,6 +516,7 @@ public class EosInitiator extends BaselineInitiator {
                 Thread.sleep(200); // poll interval every 200 ms
             } catch (InterruptedException e) {
                 e.printStackTrace();
+                return ;
             }
 
         }

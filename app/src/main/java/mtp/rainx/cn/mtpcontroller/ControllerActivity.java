@@ -29,12 +29,15 @@ import android.widget.EditText;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.IllegalFormatException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
+import cn.rainx.ptp.interfaces.FileDownloadedListener;
+import cn.rainx.ptp.interfaces.FileTransferListener;
 import cn.rainx.ptp.usbcamera.BaselineInitiator;
 import cn.rainx.ptp.usbcamera.DeviceInfo;
 import cn.rainx.ptp.usbcamera.PTPException;
@@ -171,13 +174,12 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         super.onDestroy();
         unregisterReceiver(mUsbReceiver);
         unregisterReceiver(usbPermissionReceiver);
-
         detachDevice();
     }
 
 
     void detachDevice() {
-        if( mtpDevice!=null )mtpDevice.close();
+        // if( mtpDevice!=null )mtpDevice.close();
         if (bi != null) {
             try {
                 bi.close();
@@ -439,8 +441,20 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
                 isOpenConnected = true;
 
+                bi.setFileDownloadPath(getExternalCacheDir().getAbsolutePath());
+                bi.setFileTransferListener(new FileTransferListener() {
+                    @Override
+                    public void onFileTraster(BaselineInitiator bi, int fileHandle, int totalByteLength, int transterByteLength) {
+                        Log.v(TAG, "[filehandle]" + fileHandle + ",totalByte:" + totalByteLength + ",transfter:" + transterByteLength);
+                    }
+                });
 
-
+                bi.setFileDownloadedListener(new FileDownloadedListener() {
+                    @Override
+                    public void onFileDownloaded(BaselineInitiator bi, int fileHandle, File localFile) {
+                        log("file ("  + fileHandle + ") downloaded at " + localFile.getAbsolutePath());
+                    }
+                });
 
             } catch (PTPException e) {
                 // TODO Auto-generated catch block
@@ -448,7 +462,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 log(e.toString());
             }
 
-            pollReadEvent();
+            // pollReadEvent();
         } else {
             log("设备已经连接，无需重联");
         }

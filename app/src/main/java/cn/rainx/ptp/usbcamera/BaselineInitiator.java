@@ -36,8 +36,6 @@ import cn.rainx.ptp.interfaces.FileAddedListener;
 import cn.rainx.ptp.interfaces.FileDownloadedListener;
 import cn.rainx.ptp.interfaces.FileTransferListener;
 
-import static android.R.attr.data;
-
 /**
  * This initiates interactions with USB devices, supporting only
  * mandatory PTP-over-USB operations; both
@@ -111,6 +109,9 @@ public class BaselineInitiator extends NameFactory implements Runnable {
 
     /// 文件下载路径
     protected String fileDownloadPath;
+
+    // running polling pollingThread
+    Thread pollingThread = null;
 
     
     /**
@@ -306,8 +307,8 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             switch (response.getCode()) {
                 case Response.OK:
                     session.open();
-                    Thread thread = new Thread(this);
-                    thread.start();
+                    pollingThread = new Thread(this);
+                    pollingThread.start();
                     return;
                 default:
                     throw new PTPException(response.toString());
@@ -346,12 +347,20 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
      * @throws PTPException
      */
     public void close() throws PTPException {
+        // stop and close polling thead;
+        if (pollingThread != null) {
+            pollingThread.interrupt();
+            pollingThread = null;
+        }
+
         if (isSessionActive()) {
             try {
                 closeSession();
             } catch (PTPException ignore) {
                 //
                 // Is we cannot close the session, there is nothing we can do
+                //
+            } catch (IllegalArgumentException ignore) {
                 //
             }
         }
@@ -656,7 +665,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             }
 
             // data exchanged?
-            // errors or cancel (another thread) will stall both EPs
+            // errors or cancel (another pollingThread) will stall both EPs
             if (data != null) {
 
                 // write data?
@@ -1273,18 +1282,29 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
     @Override
     public void run() {
         Log.v("PTP_EVENT", "开始event轮询");
+        long loopTimes = 0;
         if (epEv != null) {
             byte[] buffer = new byte[intrMaxPS];
             int length;
             while (isSessionActive()) {
-
-                if (!autoPollEvent) {
+                loopTimes++;
+                if (!autoPollEvent || mConnection == null) {
                     try {
                         Thread.sleep(DEFAULT_TIMEOUT);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
+                        return;
                     }
                     continue;
+                }
+
+                if (loopTimes % 100 == 0) {
+                    try {
+                        Thread.sleep(DEFAULT_TIMEOUT);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        return;
+                    }
                 }
 
                 length = readInter(DEFAULT_TIMEOUT, buffer);
@@ -1306,16 +1326,19 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
     }
 
     protected void processFileAddEvent(int fileHandle, Object event) {
+        Log.v(TAG, "start processFileAddEvent : handle -> " + fileHandle);
         for(FileAddedListener fileAddedListener: fileAddedListenerList) {
             fileAddedListener.onFileAdded(BaselineInitiator.this, fileHandle, event);
-            if (autoDownloadFile && fileDownloadPath != null) {
-                try {
-                    importFile(fileHandle, fileDownloadPath);
-                } catch (PTPException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        }
+        if (autoDownloadFile && fileDownloadPath != null) {
+            try {
+                File outputFile = new File(new File(fileDownloadPath), "tmp_" + fileHandle + ".jpg");
+                String outputFilePath = outputFile.getPath();
+                importFile(fileHandle, outputFilePath);
+            } catch (PTPException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
