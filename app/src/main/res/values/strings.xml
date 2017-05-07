@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">MtpController</string>
+    <string name="get_device_info">获取设备PTP/MTP信息</string>
+    <string name="all_usb_devices">全部设备信息</string>
+    <string name="connect_to_devices">连接到设备</string>
+    <string name="get_all_object">获取全部媒体对象</string>
+    <string name="transfer_object">传输对象</string>
+</resources>
