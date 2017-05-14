@@ -59,6 +59,29 @@
                     android:orientation="horizontal">
 
                     <Button
+                        android:id="@+id/getObjectInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/getObjectInfo" />
+
+                    <EditText
+                        android:id="@+id/ptpObjectInfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ems="10"
+                        android:hint="对象名称"
+                        android:inputType="number" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal">
+
+                    <Button
                         android:id="@+id/transferObject"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

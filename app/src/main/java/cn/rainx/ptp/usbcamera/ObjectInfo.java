@@ -298,7 +298,7 @@ public class ObjectInfo extends Data
 	tv.append  ("\n");
     }
     
-    void dump (PrintStream out)
+    public void dump (PrintStream out)
     {
 	super.dump (out);
 	out.println ("ObjectInfo:");

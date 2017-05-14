@@ -7,39 +7,37 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
-import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
-import android.mtp.MtpDevice;
-import android.mtp.MtpDeviceInfo;
-import android.mtp.MtpEvent;
-import android.mtp.MtpObjectInfo;
-import android.os.Build;
 import android.os.CancellationSignal;
-import android.os.Environment;
-import android.os.OperationCanceledException;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IllegalFormatException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
 
 import cn.rainx.ptp.interfaces.FileDownloadedListener;
 import cn.rainx.ptp.interfaces.FileTransferListener;
 import cn.rainx.ptp.usbcamera.BaselineInitiator;
 import cn.rainx.ptp.usbcamera.DeviceInfo;
+import cn.rainx.ptp.usbcamera.ObjectInfo;
 import cn.rainx.ptp.usbcamera.PTPException;
 import cn.rainx.ptp.usbcamera.eos.EosInitiator;
 import cn.rainx.ptp.usbcamera.nikon.NikonInitiator;
@@ -54,23 +52,14 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
     // 是否连接
     boolean isOpenConnected = false;
 
-    // mtp 设备句柄
-    MtpDevice mtpDevice;
-
     // USB 设备句柄
     UsbDevice usbDevice;
 
     // 对象名称
     EditText etPtpObjectName;
+    EditText etPtpObjectInfoName;
 
     CancellationSignal signal;
-
-    // 事件端点
-    protected UsbEndpoint epEv;
-    // in 端点
-    protected UsbEndpoint epIN;
-    // out 端点
-    protected UsbEndpoint epOut;
 
 
     private BaselineInitiator bi;
@@ -98,12 +87,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 log("usb设备已拔出");
                 isOpenConnected = false;
-
-                if (signal != null && !signal.isCanceled()) {
-                    signal.cancel();
-                    signal = null;
-                }
-
                 detachDevice();
             }
         }
@@ -157,8 +140,10 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         ((Button) findViewById(R.id.getDevicePTPInfo)).setOnClickListener(this);
         ((Button) findViewById(R.id.getAllObjects)).setOnClickListener(this);
         ((Button) findViewById(R.id.transferObject)).setOnClickListener(this);
+        ((Button) findViewById(R.id.getObjectInfo)).setOnClickListener(this);
 
         etPtpObjectName = (EditText) findViewById(R.id.ptpObject);
+        etPtpObjectInfoName = (EditText) findViewById(R.id.ptpObjectInfo);
 
         etLogPanel = (EditText) findViewById(R.id.logPanel);
         etLogPanel.setGravity(Gravity.BOTTOM);
@@ -179,7 +164,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
 
     void detachDevice() {
-        // if( mtpDevice!=null )mtpDevice.close();
         if (bi != null) {
             try {
                 bi.close();
@@ -187,38 +171,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 e.printStackTrace();
             }
         }
-    }
-
-
-
-    /**
-     * 轮询获取相机事件
-     */
-
-    void pollReadEvent() {
-        log("启动轮询事件线程");
-        final FutureTask<Boolean> future = new FutureTask<Boolean>(
-                new Callable<Boolean>() {
-                    @Override
-                    public Boolean call() throws IOException {
-                        try {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                while (true) {
-                                    MtpEvent event = mtpDevice.readEvent(signal);
-                                    log("获取新的event: " + event.getEventCode());
-                                }
-                            } else {
-
-                            }
-
-                            return false;
-                        } catch (OperationCanceledException exception) {
-                            return true;
-                        }
-                    }
-                });
-        final Thread thread = new Thread(future);
-        thread.start();
     }
 
 
@@ -252,6 +204,9 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
             case R.id.getAllObjects:
                 getAllObjects();
                 break;
+            case R.id.getObjectInfo:
+                getObjectInfo();
+                break;
             case R.id.transferObject:
                 transferObject();
                 break;
@@ -283,20 +238,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         }
     }
 
-    public void getDevicePTPInfo() {
-        if (isOpenConnected && mtpDevice != null) {
-            log("准备获取ptp信息");
-            MtpDeviceInfo mdi = mtpDevice.getDeviceInfo();
-            log("getManufacturer:" + mdi.getManufacturer());
-            log("getVersion:" + mdi.getVersion() );
-            log("getModel:"+mdi.getModel());
-            log("getSerialNumber:" + mdi.getSerialNumber());
-
-        } else {
-            log("mtp/ptp 设备未连接");
-        }
-    }
-
     public void getDevicePTPInfoVersion2() {
         if (isOpenConnected) {
             log("准备获取ptp信息v2");
@@ -310,27 +251,28 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
     }
 
     public void getAllObjects() {
-        if (isOpenConnected && mtpDevice != null) {
+        if (isOpenConnected && bi != null) {
             log("准备获取objects信息");
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    int[] sids = mtpDevice.getStorageIds();
-                    for (int sid : sids) {
-                        log("--------");
-                        log("检查storage id: " + sid);
-                        log("--------");
-                        int[] objectHandles = mtpDevice.getObjectHandles(sid, 0, 0);
-                        log("获取sid (" + sid + ")中的对象句柄" );
-                        for (int objectHandle : objectHandles) {
-                            MtpObjectInfo info = mtpDevice.getObjectInfo(objectHandle);
-                            if (info != null) {
-                                log("handle :" + objectHandle + "name:" +  info.getName() + " , format: "
-                                        + info.getFormat() + " , size:" + info.getCompressedSize()
-                                        + ", created: " + info.getDateCreated()
-                                    );
+                    try {
+                        int[] sids = bi.getStorageIds();
+                        for (int sid : sids) {
+                            log("--------");
+                            log("检查storage id: " + sid);
+                            log("--------");
+                            int[] objectHandles = bi.getObjectHandles(sid, 0, 0);
+                            log("获取sid (" + sid + ")中的对象句柄");
+                            List<String> strHandleList = new ArrayList<String>(objectHandles.length);
+
+                            for (int objectHandle : objectHandles) {
+                                strHandleList.add(objectHandle + "");
                             }
+                            log(TextUtils.join(",", strHandleList));
                         }
+                    } catch (PTPException e) {
+                        e.printStackTrace();
                     }
                 }
             }).start();
@@ -338,6 +280,33 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
         } else {
             log("mtp/ptp 设备未连接");
+        }
+    }
+
+    public void getObjectInfo() {
+
+        try {
+            if (isOpenConnected) {
+                final String oh = etPtpObjectInfoName.getText().toString();
+                if (oh.trim() == "") {
+                    log("请输入object handle , 为数字类型");
+                    return;
+                }
+
+                log("准备获取信息");
+
+                ObjectInfo info = bi.getObjectInfo(Integer.valueOf(oh));
+                if (info != null) {
+
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    PrintStream ps = new PrintStream(baos);
+                    info.dump(ps);
+                    String content = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+                    log(content);
+                }
+            }
+        }catch (PTPException e) {
+            e.printStackTrace();
         }
     }
 
@@ -349,7 +318,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 return;
             }
             final int ohandle = Integer.valueOf(oh);
-            // final File imageLocal = getImageFile();
 
             (new Thread(new Runnable() {
                 @Override
@@ -357,7 +325,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                     File tmp = new File(getExternalCacheDir(), "tmp_" + oh + ".jpg");
                     String outputFilePath = tmp.getPath();
                     log("准备传输数据");
-                    //boolean transfer = mtpDevice.importFile(ohandle,  outputFilePath);
                     try {
                         boolean transfer = bi.importFile(ohandle, outputFilePath);
 
@@ -374,15 +341,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         }
     }
 
-    private final File getImageFile() {
-        File appDir = new File(Environment.getExternalStorageDirectory(), "ptp_demo");
-        if (!appDir.exists()) {
-            appDir.mkdir();
-        }
-
-        String fileName = System.currentTimeMillis() + ".jpg";
-        return (new File(appDir, fileName));
-    }
 
     // 连接到ptp/mtp设备
     void connectMTPDevice(){
@@ -410,9 +368,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         UsbManager usbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
 
         if( !isOpenConnected ){
-            //log("建立mtp设备");
-            //mtpDevice = new MtpDevice(device);
-            //log("mtp设备已连接");
             try {
                 bi = new BaselineInitiator (device, usbManager.openDevice(device));
                 // Select appropriate deviceInitiator, VIDs see http://www.linux-usb.org/usb.ids
@@ -461,8 +416,6 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 e.printStackTrace();
                 log(e.toString());
             }
-
-            // pollReadEvent();
         } else {
             log("设备已经连接，无需重联");
         }

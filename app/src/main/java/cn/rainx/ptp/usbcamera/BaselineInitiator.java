@@ -1272,6 +1272,93 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         this.fileDownloadPath = fileDownloadPath;
     }
 
+    /**
+     * 获取所有存储设备id列表
+     * @return 设备id数组
+     */
+    public int[] getStorageIds() throws PTPException {
+        Response response;
+        Data data = new Data(BaselineInitiator.this);
+
+        synchronized (session) {
+            response = transact0(Command.GetStorageIDs, data);
+            switch (response.getCode()) {
+                case Response.OK:
+                    data.parse();
+                    /**
+                     * added by rainx, 研究了一下PTP协议里面，之类的ID应该用unsgined int ，但是java
+                     * 里面int为signed ，所以如果精确起见，要么使用long类型，我实现了一个nextUS32Array
+                     * 不过为了和后面的格式兼容，这里暂时还是使用 S32
+                     */
+                    return data.nextS32Array();
+                default:
+                    throw new PTPException(response.toString());
+            }
+        }
+    }
+
+
+    /**
+     * 获取所有对象的句柄
+     * 参考 MTPDevie
+     *
+     *
+     * Returns the list of object handles for all objects on the given storage unit,
+     * with the given format and parent.
+     * Information about each object can be accessed via {@link #getObjectInfo}.
+     *
+     * @param storageId the storage unit to query
+     * @param format the format of the object to return, or zero for all formats
+     * @param objectHandle the parent object to query, -1 for the storage root,
+     *     or zero for all objects
+     * @return the object handles
+     */
+
+    public int[] getObjectHandles(int storageId, int format, int objectHandle) throws PTPException{
+        Response response;
+        Data data = new Data(BaselineInitiator.this);
+
+        synchronized (session) {
+            response = transact3(Command.GetObjectHandles, data, storageId, format, objectHandle);
+            switch (response.getCode()) {
+                case Response.OK:
+                    data.parse();
+                    /**
+                     * added by rainx, 研究了一下PTP协议里面，之类的ID应该用unsgined int ，但是java
+                     * 里面int为signed ，所以如果精确起见，要么使用long类型，我实现了一个nextUS32Array
+                     * 不过为了和后面的格式兼容，这里暂时还是使用 S32
+                     */
+                    return data.nextS32Array();
+                default:
+                    throw new PTPException(response.toString());
+            }
+        }
+    }
+
+
+    /**
+     * Retrieves the {@link ObjectInfo} for an object.
+     *
+     * @param objectHandle the handle of the object
+     * @return the MtpObjectInfo
+     */
+    public ObjectInfo getObjectInfo(int objectHandle) throws PTPException{
+        Response response;
+        ObjectInfo data = new ObjectInfo(objectHandle, BaselineInitiator.this);
+
+        synchronized (session) {
+            response = transact1(Command.GetObjectHandles, data, objectHandle);
+            switch (response.getCode()) {
+                case Response.OK:
+                    data.parse();
+                    return data;
+                default:
+                    throw new PTPException(response.toString());
+            }
+        }
+    }
+
+
     ///////////////////////////////////////////////////////////////////
     // rainx added for poll event
     // mandatory for all responders:  generating events
@@ -1342,5 +1429,6 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             }
         }
     }
+
 
 }

@@ -332,4 +332,41 @@ public class Buffer
             System.out.print(String.format("%1$02X ", data[i]));
         }
     }
+
+
+    /* rainx added
+    *  因为 java里面没有ungined int ,所以32位无符号数只能用long来表示
+    *
+    /** Unmarshals a unsigned 32 bit integer from a fixed buffer offset. */
+    protected final long getUS32 (int index)
+    {
+        long retval;
+
+        retval  = (0xff & data [index++]) ;
+        retval |= (0xff & data [index++]) << 8;
+        retval |= (0xff & data [index++]) << 16;
+        retval |= (0xff & data [index  ]) << 24;
+
+        return retval;
+    }
+
+
+    /** Unmarshals the next signed 32 bit integer */
+    protected final long nextUS32 ()
+    {
+        long retval = getUS32 (offset);
+        offset += 4;
+        return retval;
+    }
+
+    /** Unmarshals an array of signed 32 bit integers. */
+    protected final long [] nextUS32Array ()
+    {
+        int len = /* unsigned */ nextS32 ();
+        long retval [] = new long [len];
+        for (int i = 0; i < len; i++) {
+            retval [i] = nextUS32 ();
+        }
+        return retval;
+    }
 }
