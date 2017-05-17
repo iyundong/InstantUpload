@@ -62,7 +62,6 @@ import cn.rainx.ptp.interfaces.FileTransferListener;
  * assume that when any IOException is thrown, your current session
  * has been terminated.
  *
- * @see Initiator
  *
  * @version $Id: BaselineInitiator.java,v 1.17 2001/05/30 19:33:43 dbrownell Exp $
  * @author David Brownell
@@ -113,12 +112,21 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     // running polling pollingThread
     Thread pollingThread = null;
 
+    public static final int SYNC_TRIGGER_MODE_EVENT = 0;
+    public static final int SYNC_TRIGGER_MODE_POLL_LIST = 1;
+
+
+    protected int syncTriggerMode = SYNC_TRIGGER_MODE_EVENT;
+
+    // 运行时的线程
+    protected volatile boolean pollThreadRunning = false;
+
     
     /**
      * Constructs a class driver object, if the device supports
      * operations according to Annex D of the PTP specification.
      *
-     * @param device the first PTP interface will be used
+     * @param dev the first PTP interface will be used
      * @exception IllegalArgumentException if the device has no
      *	Digital Still Imaging Class or PTP interfaces
      */
@@ -190,14 +198,6 @@ public class BaselineInitiator extends NameFactory implements Runnable {
                 info.factory = updateFactory(info.vendorExtensionId);
             }
             session.setFactory((NameFactory) this);
-//        } catch (USBBusyException e) {
-//            throw new PTPBusyException();
-//        } catch (USBException e) {
-//            throw new PTPException(
-//                "Error initializing the communication with the camera (" +
-//                e.getMessage()
-//                + ")" , e);
-//        }
 
     }
 
@@ -244,11 +244,6 @@ public class BaselineInitiator extends NameFactory implements Runnable {
      * This is documented to clear stalls and camera-specific suspends,
      * flush buffers, and close the current session.
      *
-     * <p> <em>TO BE DETERMINED:</em> How does this differ from a bulk
-     * protocol {@link Initiator#resetDevice ResetDevice} command?  That
-     * command is documented as very similar to this class operation.
-     * Ideally, only this control request will ever be used, since it
-     * works even when the bulk channels are halted.
      */
     public void reset() throws PTPException 
     {
@@ -1368,6 +1363,21 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
      */
     @Override
     public void run() {
+        if (syncTriggerMode == SYNC_TRIGGER_MODE_EVENT) {
+            runEventPoll();
+        } else if (syncTriggerMode == SYNC_TRIGGER_MODE_POLL_LIST){
+            try {
+                runPollListPoll();
+            } catch (PTPException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /***
+     * Common Event Poll for device
+     */
+    protected void runEventPoll() {
         Log.v("PTP_EVENT", "开始event轮询");
         long loopTimes = 0;
         if (epEv != null) {
@@ -1412,6 +1422,88 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         Log.v("PTP_EVENT", "结束轮询");
     }
 
+    protected void runPollListPoll() throws PTPException {
+        pollThreadRunning = true;
+        final String PTP_POLL_LIST = "PTP_POLL_LIST";
+        Log.v(PTP_POLL_LIST, "开始event轮询");
+        long loopTimes = 0;
+        // 调用相机的前置准备工作指令
+        pollListSetUp();
+        // 获取一次现有文件id列表
+        int[]  sids; // 存储设备id列表
+        sids = getStorageIds();
+        List<Integer> oldObjectHandles = geObjectHandlesByStorageIds(sids);
+        Log.v(PTP_POLL_LIST, "初始objectHandle列表: " + oldObjectHandles.toString());
+        while(pollThreadRunning) {
+            if (!isSessionActive() || !autoPollEvent || mConnection == null) {
+                try {
+                    Thread.sleep(DEFAULT_TIMEOUT);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    return;
+                }
+                continue;
+            } else {
+                // common timeout
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    return;
+                }
+
+                List<Integer> newObjectHandles = geObjectHandlesByStorageIds(sids);
+                List<Integer> newAdded = getAllNewAddedObjectHandles(oldObjectHandles, newObjectHandles);
+                Log.v(PTP_POLL_LIST, "New Added objectHandle : " + newAdded.toString());
+                if (newAdded.size() > 0) {
+                    for (int h : newAdded) {
+                        processFileAddEvent(h, null);
+                    }
+                    // 更新oldObjectHandle ,到最新的版本
+                    oldObjectHandles = new ArrayList<>(newObjectHandles);
+                }
+
+            }
+
+        }
+
+        // 调用相机的清理工作指令
+        pollListTearDown();
+        Log.v(PTP_POLL_LIST, "结束轮询");
+    }
+
+    private List<Integer> getAllNewAddedObjectHandles(List<Integer> oldHandles, List<Integer> newHandles) {
+        List<Integer> newAdded = new ArrayList<>();
+        for (Integer newHandle: newHandles) {
+            if (!oldHandles.contains(newHandle)) {
+                newAdded.add(newHandle);
+            }
+        }
+        return newAdded;
+    }
+
+    private List<Integer> geObjectHandlesByStorageIds(int[] sids) throws PTPException {
+        List<Integer> objectHandles;
+        objectHandles = new ArrayList<Integer>();
+        for(int sid : sids) {
+            int[] oneStorageObjectHandles = getObjectHandles(sid, 0, 0);
+            for (int h : oneStorageObjectHandles) {
+                objectHandles.add(h);
+            }
+        }
+        return objectHandles;
+    }
+
+    // 可以被子类覆盖，进行轮询之前的准备工作
+    protected void pollListSetUp() {
+
+    }
+
+    // 可以被子类覆盖，进行轮询之后的清理工作
+    protected void pollListTearDown() {
+
+    }
+
     protected void processFileAddEvent(int fileHandle, Object event) {
         Log.v(TAG, "start processFileAddEvent : handle -> " + fileHandle);
         for(FileAddedListener fileAddedListener: fileAddedListenerList) {
@@ -1428,6 +1520,15 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                 e.printStackTrace();
             }
         }
+    }
+
+
+    public int getSyncTriggerMode() {
+        return syncTriggerMode;
+    }
+
+    public void setSyncTriggerMode(int syncTriggerMode) {
+        this.syncTriggerMode = syncTriggerMode;
     }
 
 

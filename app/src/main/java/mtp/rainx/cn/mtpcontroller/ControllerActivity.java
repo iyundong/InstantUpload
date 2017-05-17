@@ -392,7 +392,9 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                     bi = new NikonInitiator (device, usbManager.openDevice(device));
                 }
 
+                bi.setSyncTriggerMode(BaselineInitiator.SYNC_TRIGGER_MODE_POLL_LIST);
                 bi.openSession();
+
 
                 isOpenConnected = true;
 
