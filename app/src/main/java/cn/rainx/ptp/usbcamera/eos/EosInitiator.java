@@ -480,19 +480,23 @@ public class EosInitiator extends BaselineInitiator {
 
 	@Override
     public void run() {
+        if (syncTriggerMode == SYNC_TRIGGER_MODE_EVENT) {
+            runEosCheckEventPoll();
+        } else if (syncTriggerMode == SYNC_TRIGGER_MODE_POLL_LIST){
+            try {
+                runPollListPoll();
+            } catch (PTPException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void runEosCheckEventPoll() {
         Log.v("PTP_EVENT", "开始event轮询");
 
         try {
-            Log.v("PTP_EVENT", "set EosSetRemoteMode 1 ");
-            int ret = transact1(Command.EosSetRemoteMode, null, 1).getCode();
-            if (ret != Response.OK) {
-                Log.v("PTP_EVENT", "set failed");
-            }
-            Log.v("PTP_EVENT", "set EosSetEventMode 1 ");
-            ret = transact1(Command.EosSetEventMode, null, 1).getCode(); // Prevents Releasing shutter
-            if (ret != Response.OK) {
-                Log.v("PTP_EVENT", "set failed");
-            }
+            setEosRemoteMode();
+            setEosEventMode();
         }catch (PTPException e) {
             e.printStackTrace();
         }
@@ -522,5 +526,31 @@ public class EosInitiator extends BaselineInitiator {
         }
         Log.v("PTP_EVENT", "结束轮询");
     }
-    
+
+    @Override
+    protected void pollListSetUp() {
+        try {
+            setEosRemoteMode();
+        } catch (PTPException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void setEosEventMode() throws PTPException {
+        int ret;
+        Log.v("PTP_EVENT", "set EosSetEventMode 1 ");
+        ret = transact1(Command.EosSetEventMode, null, 1).getCode(); // Prevents Releasing shutter
+        if (ret != Response.OK) {
+            Log.v("PTP_EVENT", "set failed");
+        }
+    }
+
+    private void setEosRemoteMode() throws PTPException {
+        Log.v("PTP_EVENT", "set EosSetRemoteMode 1 ");
+        int ret = transact1(Command.EosSetRemoteMode, null, 1).getCode();
+        if (ret != Response.OK) {
+            Log.v("PTP_EVENT", "set failed");
+        }
+    }
+
 }

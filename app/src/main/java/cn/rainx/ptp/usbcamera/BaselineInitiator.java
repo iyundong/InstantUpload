@@ -1089,6 +1089,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         }
 
         synchronized (session) {
+            long startDownloadAt = System.currentTimeMillis();
             // step 1 发送指令阶段
             Command command = new Command(Command.GetObject, session, objectHandle);
             if (!session.isActive())
@@ -1148,7 +1149,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                 outputStream.write(data.getData(), Container.HDR_LEN, initialDataLength);
                 offset += initialDataLength;
                 for(FileTransferListener fileTransferListener: fileTransferListenerList) {
-                    fileTransferListener.onFileTraster(BaselineInitiator.this, objectHandle, length, initialDataLength);
+                    fileTransferListener.onFileTranster(BaselineInitiator.this, objectHandle, length, initialDataLength);
                 }
             }
 
@@ -1161,15 +1162,16 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                 remaining -= readLen;
 
                 for(FileTransferListener fileTransferListener: fileTransferListenerList) {
-                    fileTransferListener.onFileTraster(this, objectHandle, length, length-remaining);
+                    fileTransferListener.onFileTranster(this, objectHandle, length, length-remaining);
                 }
             }
             outputStream.close();
             // step3 接收response阶段
             response = readResponse();
             if (response != null && response.getCode() == Response.OK) {
+                long downloadDuring = System.currentTimeMillis() - startDownloadAt;
                 for(FileDownloadedListener fileDownloadedListener: fileDownloadedListenerList) {
-                    fileDownloadedListener.onFileDownloaded(this, objectHandle, outputFile);
+                    fileDownloadedListener.onFileDownloaded(this, objectHandle, outputFile, downloadDuring);
                 }
                 return true;
             }

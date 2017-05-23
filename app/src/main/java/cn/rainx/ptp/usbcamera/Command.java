@@ -183,6 +183,9 @@ public class Command extends ParamVector {
     public static final int MtpGetObjectPropValue       = 0x9803;
     public static final int MtpSetObjectPropValue       = 0x9804;
     public static final int MtpGetObjPropList           = 0x9805;
+
+    // Sony Specified Command
+    public static final int SONY_SDIOCOMMAND            = 0x9201;
     
     
 	/**PTP Device Properties*/

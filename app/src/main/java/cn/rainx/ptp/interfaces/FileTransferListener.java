@@ -15,5 +15,5 @@ public interface FileTransferListener {
      * @param totalByteLength 文件总长度
      * @param transterByteLength 文件已传输长度
      */
-    void onFileTraster(BaselineInitiator bi, int fileHandle, int totalByteLength, int transterByteLength);
+    void onFileTranster(BaselineInitiator bi, int fileHandle, int totalByteLength, int transterByteLength);
 }

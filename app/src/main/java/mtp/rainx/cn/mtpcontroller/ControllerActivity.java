@@ -401,15 +401,15 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 bi.setFileDownloadPath(getExternalCacheDir().getAbsolutePath());
                 bi.setFileTransferListener(new FileTransferListener() {
                     @Override
-                    public void onFileTraster(BaselineInitiator bi, int fileHandle, int totalByteLength, int transterByteLength) {
-                        Log.v(TAG, "[filehandle]" + fileHandle + ",totalByte:" + totalByteLength + ",transfter:" + transterByteLength);
+                    public void onFileTranster(BaselineInitiator bi, int fileHandle, int totalByteLength, int transterByteLength) {
+                        //Log.v(TAG, "[filehandle]" + fileHandle + ",totalByte:" + totalByteLength + ",transfter:" + transterByteLength);
                     }
                 });
 
                 bi.setFileDownloadedListener(new FileDownloadedListener() {
                     @Override
-                    public void onFileDownloaded(BaselineInitiator bi, int fileHandle, File localFile) {
-                        log("file ("  + fileHandle + ") downloaded at " + localFile.getAbsolutePath());
+                    public void onFileDownloaded(BaselineInitiator bi, int fileHandle, File localFile, long timeduring) {
+                        log("file ("  + fileHandle + ") downloaded at " + localFile.getAbsolutePath() + ",time: " + timeduring + "ms");
                     }
                 });
 
