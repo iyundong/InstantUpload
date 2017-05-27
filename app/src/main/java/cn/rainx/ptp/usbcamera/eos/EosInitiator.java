@@ -27,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import cn.rainx.ptp.params.SyncParams;
 import cn.rainx.ptp.usbcamera.BaselineInitiator;
 import cn.rainx.ptp.usbcamera.Command;
 import cn.rainx.ptp.usbcamera.Container;
@@ -480,9 +481,9 @@ public class EosInitiator extends BaselineInitiator {
 
 	@Override
     public void run() {
-        if (syncTriggerMode == SYNC_TRIGGER_MODE_EVENT) {
+        if (syncTriggerMode == SyncParams.SYNC_TRIGGER_MODE_EVENT) {
             runEosCheckEventPoll();
-        } else if (syncTriggerMode == SYNC_TRIGGER_MODE_POLL_LIST){
+        } else if (syncTriggerMode == SyncParams.SYNC_TRIGGER_MODE_POLL_LIST){
             try {
                 runPollListPoll();
             } catch (PTPException e) {

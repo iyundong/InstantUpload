@@ -32,9 +32,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import cn.rainx.ptp.db.SyncDevice;
+import cn.rainx.ptp.db.SyncDeviceManager;
 import cn.rainx.ptp.interfaces.FileAddedListener;
 import cn.rainx.ptp.interfaces.FileDownloadedListener;
 import cn.rainx.ptp.interfaces.FileTransferListener;
+import cn.rainx.ptp.params.SyncParams;
 
 /**
  * This initiates interactions with USB devices, supporting only
@@ -109,14 +112,17 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     /// 文件下载路径
     protected String fileDownloadPath;
 
+
+
     // running polling pollingThread
     Thread pollingThread = null;
 
-    public static final int SYNC_TRIGGER_MODE_EVENT = 0;
-    public static final int SYNC_TRIGGER_MODE_POLL_LIST = 1;
-
-
-    protected int syncTriggerMode = SYNC_TRIGGER_MODE_EVENT;
+    // 同步触发模式
+    protected int syncTriggerMode = SyncParams.SYNC_TRIGGER_MODE_EVENT;
+    // 同步模式
+    protected int syncMode = SyncParams.SYNC_MODE_SYNC_NEW_ADDED;
+    // 同步记录模式
+    protected int syncRecordMode = SyncParams.SYNC_RECORD_MODE_REMEMBER;
 
     // 运行时的线程
     protected volatile boolean pollThreadRunning = false;
@@ -1158,6 +1164,11 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                 int toRead = (remaining > inMaxPS )? inMaxPS : remaining;
                 readLen = mConnection.bulkTransfer(epIn, readBuffer, toRead,
                         DEFAULT_TIMEOUT);
+                if (readLen > inMaxPS) {
+                    // should not be true; but it happens
+                    Log.d(TAG, "readLen " + readLen + " is bigger than inMaxPS:" + inMaxPS);
+                    readLen = inMaxPS;
+                }
                 outputStream.write(readBuffer, 0, readLen);
                 remaining -= readLen;
 
@@ -1365,9 +1376,10 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
      */
     @Override
     public void run() {
-        if (syncTriggerMode == SYNC_TRIGGER_MODE_EVENT) {
+
+        if (syncTriggerMode == SyncParams.SYNC_TRIGGER_MODE_EVENT) {
             runEventPoll();
-        } else if (syncTriggerMode == SYNC_TRIGGER_MODE_POLL_LIST){
+        } else if (syncTriggerMode == SyncParams.SYNC_TRIGGER_MODE_POLL_LIST){
             try {
                 runPollListPoll();
             } catch (PTPException e) {
@@ -1429,12 +1441,46 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         final String PTP_POLL_LIST = "PTP_POLL_LIST";
         Log.v(PTP_POLL_LIST, "开始event轮询");
         long loopTimes = 0;
+        SyncDeviceManager syncDeviceManager;
+
         // 调用相机的前置准备工作指令
         pollListSetUp();
         // 获取一次现有文件id列表
+        List<Integer> oldObjectHandles;
+
         int[]  sids; // 存储设备id列表
         sids = getStorageIds();
-        List<Integer> oldObjectHandles = geObjectHandlesByStorageIds(sids);
+
+        if (syncRecordMode == SyncParams.SYNC_RECORD_MODE_REMEMBER) {
+            syncDeviceManager = new SyncDeviceManager(device);
+            SyncDevice syncDevice = syncDeviceManager.updateDeviceInfo();
+            // 之前记录过
+            if (syncDevice.getSyncAt() != null) {
+                oldObjectHandles = syncDeviceManager.getIdList();
+            } else {
+                if (syncMode == SyncParams.SYNC_MODE_SYNC_ALL) {
+                    oldObjectHandles = new ArrayList<>();
+                } else {
+                    oldObjectHandles = getObjectHandlesByStorageIds(sids);
+                }
+                if (oldObjectHandles != null) {
+                    syncDeviceManager.updateIdList(oldObjectHandles);
+                } else {
+                    Log.d(TAG, "init oldObjectHandles is null");
+                }
+            }
+        } else if (syncRecordMode == SyncParams.SYNC_RECORD_MODE_FORGET) {
+            if (syncMode == SyncParams.SYNC_MODE_SYNC_ALL) {
+                oldObjectHandles = new ArrayList<>();
+            } else {
+                oldObjectHandles = getObjectHandlesByStorageIds(sids);
+            }
+        } else {
+            //oops should not be here
+            oldObjectHandles = new ArrayList<>();
+        }
+
+
         Log.v(PTP_POLL_LIST, "初始objectHandle列表: " + oldObjectHandles.toString());
         while(pollThreadRunning) {
             if (!isSessionActive() || !autoPollEvent || mConnection == null) {
@@ -1454,15 +1500,35 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                     return;
                 }
 
-                List<Integer> newObjectHandles = geObjectHandlesByStorageIds(sids);
+                List<Integer> newObjectHandles = getObjectHandlesByStorageIds(sids);
                 List<Integer> newAdded = getAllNewAddedObjectHandles(oldObjectHandles, newObjectHandles);
                 Log.v(PTP_POLL_LIST, "New Added objectHandle : " + newAdded.toString());
+                List<Integer> newAddedDownloaded = new ArrayList<Integer>();
                 if (newAdded.size() > 0) {
+                    boolean downloadInterrupted = false;
                     for (int h : newAdded) {
-                        processFileAddEvent(h, null);
+                        if (processFileAddEvent(h, null)) {
+                            // 如果文件下载成功，则记录
+                            newAddedDownloaded.add(h);
+                        } else {
+                            // 如果下载失败，退出循环
+                            downloadInterrupted = true;
+                            break;
+                        }
                     }
+
                     // 更新oldObjectHandle ,到最新的版本
-                    oldObjectHandles = new ArrayList<>(newObjectHandles);
+                    if (!downloadInterrupted) {
+                        oldObjectHandles = new ArrayList<>(newObjectHandles);
+                    } else {
+                        // 如果下载终端，则只添加成功下载的handle id
+                        oldObjectHandles.addAll(newAddedDownloaded);
+                    }
+
+                    if (syncRecordMode == SyncParams.SYNC_RECORD_MODE_REMEMBER) {
+                        syncDeviceManager = new SyncDeviceManager(device);
+                        syncDeviceManager.updateIdList(oldObjectHandles);
+                    }
                 }
 
             }
@@ -1474,6 +1540,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         Log.v(PTP_POLL_LIST, "结束轮询");
     }
 
+
     private List<Integer> getAllNewAddedObjectHandles(List<Integer> oldHandles, List<Integer> newHandles) {
         List<Integer> newAdded = new ArrayList<>();
         for (Integer newHandle: newHandles) {
@@ -1484,7 +1551,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         return newAdded;
     }
 
-    private List<Integer> geObjectHandlesByStorageIds(int[] sids) throws PTPException {
+    private List<Integer> getObjectHandlesByStorageIds(int[] sids) throws PTPException {
         List<Integer> objectHandles;
         objectHandles = new ArrayList<Integer>();
         for(int sid : sids) {
@@ -1499,6 +1566,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
     // 可以被子类覆盖，进行轮询之前的准备工作
     protected void pollListSetUp() {
 
+
     }
 
     // 可以被子类覆盖，进行轮询之后的清理工作
@@ -1506,7 +1574,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
     }
 
-    protected void processFileAddEvent(int fileHandle, Object event) {
+    protected boolean processFileAddEvent(int fileHandle, Object event) {
         Log.v(TAG, "start processFileAddEvent : handle -> " + fileHandle);
         for(FileAddedListener fileAddedListener: fileAddedListenerList) {
             fileAddedListener.onFileAdded(BaselineInitiator.this, fileHandle, event);
@@ -1514,14 +1582,24 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         if (autoDownloadFile && fileDownloadPath != null) {
             try {
                 File outputFile = new File(new File(fileDownloadPath), "tmp_" + fileHandle + ".jpg");
+                if (outputFile.exists()) {
+                    outputFile.delete();
+                }
                 String outputFilePath = outputFile.getPath();
                 importFile(fileHandle, outputFilePath);
+                return true;
             } catch (PTPException e) {
                 e.printStackTrace();
+                return false;
             } catch (IOException e) {
                 e.printStackTrace();
+                return false;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
             }
         }
+        return false;
     }
 
 

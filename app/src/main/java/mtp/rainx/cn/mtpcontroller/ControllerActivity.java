@@ -21,13 +21,10 @@ import android.widget.EditText;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.IllegalFormatException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +32,12 @@ import java.util.Set;
 
 import cn.rainx.ptp.interfaces.FileDownloadedListener;
 import cn.rainx.ptp.interfaces.FileTransferListener;
+import cn.rainx.ptp.params.SyncParams;
 import cn.rainx.ptp.usbcamera.BaselineInitiator;
 import cn.rainx.ptp.usbcamera.DeviceInfo;
+import cn.rainx.ptp.usbcamera.InitiatorFactory;
 import cn.rainx.ptp.usbcamera.ObjectInfo;
 import cn.rainx.ptp.usbcamera.PTPException;
-import cn.rainx.ptp.usbcamera.eos.EosInitiator;
-import cn.rainx.ptp.usbcamera.nikon.NikonInitiator;
 
 public class ControllerActivity extends AppCompatActivity implements View.OnClickListener{
 
@@ -61,18 +58,13 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
     CancellationSignal signal;
 
-
     private BaselineInitiator bi;
-
 
     // 接口
     protected UsbInterface 				intf;
 
     protected UsbDeviceConnection mConnection = null;
 
-
-    protected boolean isCanon = false;
-    protected boolean isNikon = false;
 
 
     /**
@@ -369,32 +361,10 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
         if( !isOpenConnected ){
             try {
-                bi = new BaselineInitiator (device, usbManager.openDevice(device));
-                // Select appropriate deviceInitiator, VIDs see http://www.linux-usb.org/usb.ids
-                if (bi.device.getVendorId() == EosInitiator.CANON_VID) {
-                    try {
-                        bi.getClearStatus();
-                        bi.close();
-                    } catch (PTPException e) {e.printStackTrace();}
-                    Log.d(TAG, "Device is CANON, open EOSInitiator");
-                    isCanon = true;
-                    isNikon = false;
-                    bi = new EosInitiator(device, usbManager.openDevice(device));
-                }
-                else if (device.getVendorId() == NikonInitiator.NIKON_VID) {
-                    try {
-                        bi.getClearStatus();
-                        bi.close();
-                    } catch (PTPException e) {e.printStackTrace();}
-                    Log.d(TAG, "Device is Nikon, open NikonInitiator");
-                    isCanon = false;
-                    isNikon = true;
-                    bi = new NikonInitiator (device, usbManager.openDevice(device));
-                }
-
-                bi.setSyncTriggerMode(BaselineInitiator.SYNC_TRIGGER_MODE_POLL_LIST);
+                bi = InitiatorFactory.produceInitiator(device, usbManager);
+                bi.getClearStatus(); // ?????
+                bi.setSyncTriggerMode(SyncParams.SYNC_TRIGGER_MODE_POLL_LIST);
                 bi.openSession();
-
 
                 isOpenConnected = true;
 
