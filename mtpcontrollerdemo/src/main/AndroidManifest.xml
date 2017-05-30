@@ -1,29 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="mtp.rainx.cn.mtpcontroller">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.rainx.demo">
 
-    <!-- 作为  USB HOST 设备 -->
-    <uses-feature android:name="android.hardware.usb.host" />
+    <application android:allowBackup="true" android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name" android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true" android:theme="@style/AppTheme"
+        android:name="com.orm.SugarApp">
 
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme"
-        android:name="com.orm.SugarApp"
-        >
 
         <meta-data android:name="DATABASE" android:value="mtp_device_sync_info.db" />
         <meta-data android:name="VERSION" android:value="2" />
         <meta-data android:name="QUERY_LOG" android:value="true" />
         <meta-data android:name="DOMAIN_PACKAGE_NAME" android:value="cn.rainx.ptp" />
 
-        <activity android:name=".ControllerActivity">
+        <activity android:name="ControllerActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
 
 
@@ -43,6 +34,8 @@
                     android:resource="@xml/device_filter" />
             </intent-filter>
         </activity>
+
     </application>
+
 
 </manifest>

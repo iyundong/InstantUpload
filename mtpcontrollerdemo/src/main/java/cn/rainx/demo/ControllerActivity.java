@@ -1,4 +1,4 @@
-package mtp.rainx.cn.mtpcontroller;
+package cn.rainx.demo;
 
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -150,7 +150,12 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(mUsbReceiver);
-        unregisterReceiver(usbPermissionReceiver);
+        try {
+            unregisterReceiver(usbPermissionReceiver);
+        } catch (Exception e) {
+            // 如果之前没有注册, 则会抛出异常
+            e.printStackTrace();
+        }
         detachDevice();
     }
 
