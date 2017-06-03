@@ -16,23 +16,21 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-
-
-                <!-- 在 USB 设备连接/拔出的时候获得通知  -->
-                <intent-filter>
-                    <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-                </intent-filter>
-
-                <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
-                    android:resource="@xml/device_filter" />
-
-                <intent-filter>
-                    <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
-                </intent-filter>
-
-                <meta-data android:name="android.hardware.usb.action.USB_DEVICE_DETACHED"
-                    android:resource="@xml/device_filter" />
             </intent-filter>
+            <!-- 在 USB 设备连接/拔出的时候获得通知  -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+
+            <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
+            </intent-filter>
+
+            <meta-data android:name="android.hardware.usb.action.USB_DEVICE_DETACHED"
+                android:resource="@xml/device_filter" />
         </activity>
 
     </application>

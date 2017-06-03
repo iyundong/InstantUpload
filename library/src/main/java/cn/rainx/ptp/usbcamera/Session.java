@@ -24,14 +24,14 @@ package cn.rainx.ptp.usbcamera;
  * @version $Id: Session.java,v 1.3 2001/04/12 23:13:00 dbrownell Exp $
  * @author David Brownell
  */
-class Session
+public class Session
 {
     private int		sessionId;
     private int		xid;
     private boolean	active;
     private NameFactory	factory;
 
-    Session () { }
+    public Session () { }
 
     void setFactory (NameFactory f) { factory = f; }
     

@@ -99,6 +99,8 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     public UsbDeviceConnection mConnection = null; // must be initialized first!
     	// mUsbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
 
+    protected int OBJECT_ADDED_EVENT_CODE = Event.ObjectAdded;
+
     protected List<FileAddedListener> fileAddedListenerList = new ArrayList<FileAddedListener>();
     protected List<FileDownloadedListener> fileDownloadedListenerList = new ArrayList<FileDownloadedListener>();
     protected List<FileTransferListener> fileTransferListenerList = new ArrayList<FileTransferListener>();
@@ -127,7 +129,11 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     // 运行时的线程
     protected volatile boolean pollThreadRunning = false;
 
-    
+
+
+    // 提供一个默认的构造函数，供子类继承时使用
+    protected BaselineInitiator() { };
+
     /**
      * Constructs a class driver object, if the device supports
      * operations according to Annex D of the PTP specification.
@@ -209,7 +215,7 @@ public class BaselineInitiator extends NameFactory implements Runnable {
 
     
 	// searches for an interface on the given USB device, returns only class 6  // From androiddevelopers ADB-Test
-	private UsbInterface findUsbInterface(UsbDevice device) {
+	protected UsbInterface findUsbInterface(UsbDevice device) {
 		//Log.d (TAG, "findAdbInterface " + device.getDeviceName());
 		int count = device.getInterfaceCount();
 		for (int i = 0; i < count; i++) {
@@ -535,7 +541,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
     // returns Response.OK, Response.DeviceBusy, etc
     // per fig D.6, response may hold stalled endpoint numbers
-    private int getDeviceStatus(Buffer buf)
+    protected int getDeviceStatus(Buffer buf)
     throws PTPException {
 //        try {
     	if (mConnection == null) throw new PTPException("No Connection");
@@ -585,7 +591,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
      * with all responders.  This is the only generic PTP command
      * that may be issued both inside or outside of a session.
      */
-    private DeviceInfo getDeviceInfoUncached()
+    protected DeviceInfo getDeviceInfoUncached()
     throws PTPException {
         DeviceInfo data = new DeviceInfo(this);
         Response response;
@@ -839,7 +845,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 //        }
     }
 
-    private void endpointSanityCheck() throws PTPException {
+    protected void endpointSanityCheck() throws PTPException {
         if (epIn == null) {
             throw new PTPException("No input end-point found!");
         }
@@ -1394,6 +1400,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
     protected void runEventPoll() {
         Log.v("PTP_EVENT", "开始event轮询");
         long loopTimes = 0;
+        pollEventSetUp();
         if (epEv != null) {
             byte[] buffer = new byte[intrMaxPS];
             int length;
@@ -1425,7 +1432,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                     Event event = new Event(buffer, null);
                     Log.v("PTP_EVENT","event is : " + event.toString());
 
-                    if (event.getCode() == Event.ObjectAdded) {
+                    if (event.getCode() == getObjectAddedEventCode()) {
                         int fileHandle = event.getParam1();
 
                         processFileAddEvent(fileHandle, event);
@@ -1434,6 +1441,10 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             }
         }
         Log.v("PTP_EVENT", "结束轮询");
+    }
+
+    protected int getObjectAddedEventCode() {
+        return OBJECT_ADDED_EVENT_CODE;
     }
 
     protected void runPollListPoll() throws PTPException {
@@ -1450,7 +1461,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
         int[]  sids; // 存储设备id列表
         sids = getStorageIds();
-
+        pollListAfterGetStorages(sids);
         if (syncRecordMode == SyncParams.SYNC_RECORD_MODE_REMEMBER) {
             syncDeviceManager = new SyncDeviceManager(device);
             SyncDevice syncDevice = syncDeviceManager.updateDeviceInfo();
@@ -1571,6 +1582,15 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
     // 可以被子类覆盖，进行轮询之后的清理工作
     protected void pollListTearDown() {
+
+    }
+
+    protected void pollListAfterGetStorages(int ids[]) {
+
+    }
+
+    // poll event setup mode
+    protected void pollEventSetUp() {
 
     }
 

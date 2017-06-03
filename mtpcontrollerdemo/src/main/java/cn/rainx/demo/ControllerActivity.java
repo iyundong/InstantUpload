@@ -38,6 +38,7 @@ import cn.rainx.ptp.usbcamera.DeviceInfo;
 import cn.rainx.ptp.usbcamera.InitiatorFactory;
 import cn.rainx.ptp.usbcamera.ObjectInfo;
 import cn.rainx.ptp.usbcamera.PTPException;
+import cn.rainx.ptp.usbcamera.sony.SonyInitiator;
 
 public class ControllerActivity extends AppCompatActivity implements View.OnClickListener{
 
@@ -369,9 +370,15 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 bi = InitiatorFactory.produceInitiator(device, usbManager);
                 bi.getClearStatus(); // ?????
                 bi.setSyncTriggerMode(SyncParams.SYNC_TRIGGER_MODE_POLL_LIST);
+                if (bi instanceof SonyInitiator) {
+                    // 索尼只能支持event 模式
+                    bi.setSyncTriggerMode(SyncParams.SYNC_TRIGGER_MODE_EVENT);
+                }
                 bi.openSession();
 
                 isOpenConnected = true;
+
+
 
                 bi.setFileDownloadPath(getExternalCacheDir().getAbsolutePath());
                 bi.setFileTransferListener(new FileTransferListener() {
