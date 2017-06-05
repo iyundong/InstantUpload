@@ -57,13 +57,13 @@ import java.util.Vector;
  */
 public class DevicePropDesc extends Data
 {
-    int			propertyCode;
-    int			dataType;
-    boolean		writable;
-    Object factoryDefault;
-    Object currentValue;
-    int			formType;
-    Object constraints;
+    protected int			propertyCode;
+	protected int			dataType;
+	protected boolean		writable;
+	protected Object factoryDefault;
+	protected Object currentValue;
+	protected int			formType;
+	protected Object constraints;
 
     public DevicePropDesc (NameFactory f) { super (f); }
 
@@ -96,49 +96,54 @@ public class DevicePropDesc extends Data
 		break;
 	}
     }
-    public void showInTextView (TextView tv)
+
+    /*
+    dump string
+     */
+    public String toString ()
     {
 
-	tv.setText(factory.getPropertyName (propertyCode));
-	tv.append (" = ");
-	tv.append (""+currentValue);
-	if (!writable)
-	    tv.append (", read-only");
-	tv.append (", ");
-	tv.append (DevicePropValue.getTypeName (dataType));
-	switch (formType) {
-	    case 0:
-		break;
-	    case 1: {
-		Range	r = (Range) constraints;
-		tv.append (" from ");
-		tv.append (""+r.getMinimum ());
-		tv.append (" to ");
-		tv.append (""+r.getMaximum ());
-		tv.append (" by ");
-		tv.append (""+r.getIncrement ());
-		};
-		break;
-	    case 2:  {
-		Vector v = (Vector) constraints;
-		tv.append (" { ");
-		for (int i = 0; i < v.size (); i++) {
-		    if (i != 0)
-			tv.append (", ");
-		    tv.append (""+v.elementAt (i));
+		StringBuffer tv = new StringBuffer(factory.getPropertyName (propertyCode));
+		tv.append (" = ");
+		tv.append (""+currentValue);
+		if (!writable)
+			tv.append (", read-only");
+		tv.append (", ");
+		tv.append (DevicePropValue.getTypeName (dataType));
+		switch (formType) {
+			case 0:
+			break;
+			case 1: {
+			Range	r = (Range) constraints;
+			tv.append (" from ");
+			tv.append (""+r.getMinimum ());
+			tv.append (" to ");
+			tv.append (""+r.getMaximum ());
+			tv.append (" by ");
+			tv.append (""+r.getIncrement ());
+			};
+			break;
+			case 2:  {
+			Vector v = (Vector) constraints;
+			tv.append (" { ");
+			for (int i = 0; i < v.size (); i++) {
+				if (i != 0)
+				tv.append (", ");
+				tv.append (""+v.elementAt (i));
+			}
+			tv.append (" }");
+			}
+			break;
+			default:
+			tv.append (" form ");
+			tv.append (""+formType);
+			tv.append (" (error)");
 		}
-		tv.append (" }");
-		}
-		break;
-	    default:
-		tv.append (" form ");
-		tv.append (""+formType);
-		tv.append (" (error)");
-	}
 
-	tv.append (", default ");
-	tv.append  ("\n");
-	tv.append ("Factory Default:"+factoryDefault);
+		tv.append (", default ");
+		tv.append  ("\n");
+		tv.append ("Factory Default:"+factoryDefault);
+		return tv.toString();
     }
     
     
@@ -320,7 +325,7 @@ public class DevicePropDesc extends Data
     {
 	private Object min, max, step;
 
-	Range (int dataType, DevicePropDesc desc)
+	public Range (int dataType, DevicePropDesc desc)
 	{
 	    min = DevicePropValue.get (dataType, desc);
 	    max = DevicePropValue.get (dataType, desc);
@@ -346,7 +351,7 @@ public class DevicePropDesc extends Data
     }
 
 
-    private Vector parseEnumeration ()
+    protected Vector parseEnumeration ()
     {
 	int	len = nextU16 ();
 	Vector retval = new Vector(len);
@@ -364,4 +369,8 @@ public class DevicePropDesc extends Data
 	    return (Vector) constraints;
 	return null;
     }
+
+    public int getPropertyCode() {
+		return propertyCode;
+	}
 }

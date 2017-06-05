@@ -5,13 +5,19 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.util.Log;
+import android.util.Pair;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import cn.rainx.ptp.usbcamera.BaselineInitiator;
 import cn.rainx.ptp.usbcamera.Command;
 import cn.rainx.ptp.usbcamera.Data;
 import cn.rainx.ptp.usbcamera.DeviceInfo;
+import cn.rainx.ptp.usbcamera.DevicePropDesc;
+import cn.rainx.ptp.usbcamera.Event;
+import cn.rainx.ptp.usbcamera.ObjectInfo;
 import cn.rainx.ptp.usbcamera.PTPException;
 import cn.rainx.ptp.usbcamera.Response;
 import cn.rainx.ptp.usbcamera.Session;
@@ -25,6 +31,9 @@ public class SonyInitiator extends BaselineInitiator {
 
     protected int OBJECT_ADDED_EVENT_CODE = 0xc201;
     protected int PTP_OC_SONY_GetAllDevicePropData = 0x9209;
+    protected int PTP_DPC_SONY_ObjectInMemory = 0xD215;
+    protected int PTP_OC_SONY_GetDevicePropdesc = 0x9203;
+    protected int PTP_OC_SONY_GetSDIOGetExtDeviceInfo = 0x9202;
 
     /**
      * Constructs a class driver object, if the device supports
@@ -73,33 +82,6 @@ public class SonyInitiator extends BaselineInitiator {
         reset();
     }
 
-    protected DeviceInfo getDeviceInfoUncached() throws PTPException {
-        setSDIOConnect(0x01);
-        setSDIOConnect(0x02);
-        return super.getDeviceInfoUncached();
-    }
-
-
-    // 可以被子类覆盖，进行轮询之前的准备工作
-    protected void pollListSetUp() {
-
-        super.pollListSetUp();
-        setSDIOConnect(0x01);
-        setSDIOConnect(0x02);
-    }
-
-    protected void pollListAfterGetStorages(int ids[]) {
-        Log.v(TAG, "pollListAfterGetStorages : get storages : " + Arrays.toString(ids));
-        setSDIOConnect(0x03);
-    }
-
-    @Override
-    protected void pollEventSetUp() {
-        super.pollEventSetUp();
-        setSDIOConnect(0x01);
-        setSDIOConnect(0x02);
-        setSDIOConnect(0x03);
-    }
 
     protected int getObjectAddedEventCode() {
         return OBJECT_ADDED_EVENT_CODE;
@@ -116,21 +98,156 @@ public class SonyInitiator extends BaselineInitiator {
     GP_LOG_D ("DEBUG== 0xd215 after capture = %d", dpd.CurrentValue.u16);
     */
 
+    /***
+     * Sony Event Poll for device
+     */
+    protected void runEventPoll_NOTUSE() throws PTPException {
+        Log.v("PTP_EVENT", "开始event轮询");
+        long loopTimes = 0;
+        pollEventSetUp();
+        byte[] buffer = new byte[intrMaxPS];
+        int length;
+        while (isSessionActive()) {
+            loopTimes++;
+            if (!autoPollEvent || mConnection == null) {
+                try {
+                    Thread.sleep(DEFAULT_TIMEOUT);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    return;
+                }
+                continue;
+            }
+
+            if (loopTimes % 100 == 0) {
+                try {
+                    Thread.sleep(DEFAULT_TIMEOUT);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    return;
+                }
+            }
+
+            getAllDevicePropDesc();
+            List<DevicePropDesc> props = getAllDevicePropDesc();
+            if (props == null) {
+                return;
+            }
+            for (DevicePropDesc prop : props) {
+                // 	{PTP_DPC_SONY_ObjectInMemory, N_("Objects in memory")},	/* 0xD215 */
+                // Log.d(TAG, prop.toString());
+                if (prop.getPropertyCode() == PTP_DPC_SONY_ObjectInMemory) {
+                    if ((Integer) prop.getValue() > 0x8000 ) {
+                        Log.d (TAG, "SONY ObjectInMemory count change seen, retrieving file");
+                        ObjectInfo info = getObjectInfo(0xffffc001);
+                        processFileAddEvent(0xffffc001 , null);
+                    } else {
+                        Log.d(TAG, "current prop.value of PTP_DPC_SONY_ObjectInMemory is " + Integer.toHexString((Integer) prop.getValue()));
+                    }
+                }
+            }
+        }
+
+        Log.v("PTP_EVENT", "结束轮询");
+    }
+
+    protected void waitVendorSpecifiedFileReadySignal() {
+        long start = System.currentTimeMillis();
+        // 5 秒的超时时间
+        while (System.currentTimeMillis() - start < 15000) {
+            // to avoid cache
+            getAllDevicePropDesc();
+            List<DevicePropDesc> props = getAllDevicePropDesc();
+            if (props == null) {
+                return;
+            }
+            for (DevicePropDesc prop : props) {
+                // 	{PTP_DPC_SONY_ObjectInMemory, N_("Objects in memory")},	/* 0xD215 */
+                // Log.d(TAG, prop.toString());
+                if (prop.getPropertyCode() == PTP_DPC_SONY_ObjectInMemory) {
+                    if ((Integer) prop.getValue() > 0x8000 ) {
+                        try {
+                            ObjectInfo info = getObjectInfo(0xffffc001);
+                        } catch (PTPException e) {
+                            e.printStackTrace();
+                        }
+                        Log.d (TAG, "SONY ObjectInMemory count change seen, retrieving file");
+                        return;
+                    } else {
+                        Log.d(TAG, "current PTP_DPC_SONY_ObjectInMemory is " + Integer.toHexString((Integer) prop.getValue()) );
+                    }
+                }
+            }
+        }
+        Log.d(TAG, "Sony waitVendorSpecifiedFileReadySignal timeout!" );
+    }
+
+    protected void waitVendorSpecifiedFileReadySignal1() {
+        try {
+            Thread.sleep(2000l);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
 
 
 
-    // just for avoid caching , so ..
-    public void getAllDevicePropDesc() {
+
+    // 获取所有的属性列表
+    public List<DevicePropDesc> getAllDevicePropDesc() {
         Response response;
         Data data = new Data(this);
+
+        /*
+         Key: PropCode,
+         Value: PropValue
+         */
+        List<DevicePropDesc> props = new ArrayList<>();
 
         synchronized (session) {
             try {
                 response = transact0(PTP_OC_SONY_GetAllDevicePropData, data);
-                // 我们这里就不做解析了
+                if (data == null) {
+                    Log.d(TAG, "data is null");
+                    return null;
+                }
+                if (data.getLength() < 8) {
+                    Log.d(TAG, "data length is short than 8");
+                    return null;
+                }
+
+                Log.d(TAG, "PTP_OC_SONY_GetAllDevicePropData recv data is : " + byteArrayToHex(data.data));
+
+                data.offset = 12 + 8;
+                while (data.getLength() - data.offset>0) {
+                    SonyDevicePropDesc desc = new SonyDevicePropDesc(this, data);
+                    try {
+                        desc.parse();
+
+                    }catch (Exception e) {
+                        e.printStackTrace();
+                        break;
+                    }
+                    props.add(desc);
+                }
+                return props;
             } catch (PTPException e) {
                 e.printStackTrace();
+                return null;
             }
+        }
+    }
+
+    public DevicePropDesc getDevicePropDesc(int propcode) {
+        Response response;
+        Data data = new Data(this);
+        try {
+            response = transact1(PTP_OC_SONY_GetDevicePropdesc, data, propcode);
+            data.toString();
+            return null;
+        } catch (PTPException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 
@@ -150,4 +267,60 @@ public class SonyInitiator extends BaselineInitiator {
         }
     }
 
+
+    @Override
+    protected void pollEventSetUp() {
+        super.pollEventSetUp();
+        // get device info first
+        try {
+            getDeviceInfo();
+        }catch (PTPException e) {
+            e.printStackTrace();
+        }
+        setSDIOConnect(0x01);
+        setSDIOConnect(0x02);
+        sendSonyGetExtDeviceInfoCommand();
+        setSDIOConnect(0x03);
+    }
+
+    private void sendSonyGetExtDeviceInfoCommand() {
+        Data data = new Data(this);
+        try {
+            transact1(PTP_OC_SONY_GetSDIOGetExtDeviceInfo, data, 0xc8);
+        } catch (PTPException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    // 可以被子类覆盖，进行轮询之前的准备工作
+    protected void pollListSetUp() {
+
+        super.pollListSetUp();
+        // get device info first
+        try {
+            getDeviceInfo();
+        }catch (PTPException e) {
+            e.printStackTrace();
+        }
+        setSDIOConnect(0x01);
+        setSDIOConnect(0x02);
+        sendSonyGetExtDeviceInfoCommand();
+    }
+
+    protected void pollListAfterGetStorages(int ids[]) {
+        Log.v(TAG, "pollListAfterGetStorages : get storages : " + Arrays.toString(ids));
+        setSDIOConnect(0x03);
+    }
+
+
+    public void openSession() throws PTPException {
+        Log.d(TAG,"claimInterface");
+        mConnection.claimInterface(intf, false);
+        super.openSession();
+    }
+
+    public void close() throws PTPException {
+        super.close();
+    }
 }

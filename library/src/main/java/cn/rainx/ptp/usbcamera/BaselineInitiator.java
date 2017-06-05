@@ -661,8 +661,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                 System.err.println(command.toString());
             }
             int lenC = mConnection.bulkTransfer(epOut, command.data , command.length , DEFAULT_TIMEOUT);
-//			Log.d(TAG, "Command bytes sent " +lenC);
-//            stream.write(command.data, 0, command.length);
+			Log.d(TAG, "Command " +  command._getOpcodeString(command.getCode()) + " bytes sent " +lenC);
 
             // may need to terminate request with zero length packet
             if ((command.length % epOut.getMaxPacketSize()) == 0) {
@@ -740,12 +739,27 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 					int readLen = 0;
 					readLen = mConnection.bulkTransfer(epIn, readBuffer, inMaxPS,
 							DEFAULT_TIMEOUT);
+                    if (readLen == 0) {
+                        // rainx note: 有的时候，端点会返回空包，这个时候需要再次发送请求
+                        Log.d(TAG, "rainx note: 有的时候，端点会返回空包，这个时候需要再次发送请求 ");
+                        readLen = mConnection.bulkTransfer(epIn, readBuffer, inMaxPS,
+                                DEFAULT_TIMEOUT);
+                    }
 					data.data = readBuffer;
 					data.length = readLen;
 					if (!"data".equals(data.getBlockTypeName(data.getBlockType()))
 							|| data.getCode() != command.getCode()
 							|| data.getXID() != command.getXID()) {
-						throw new PTPException("protocol err 1, " + data);
+                        if (data.getLength() == 0) {
+                            readLen = mConnection.bulkTransfer(epIn, readBuffer, inMaxPS,
+                                    DEFAULT_TIMEOUT);
+                            data.data = readBuffer;
+                            data.length = readLen;
+
+                            Log.d(TAG, "read a unkonwn pack , read again:" + byteArrayToHex(data.data));
+                        }
+						throw new PTPException("protocol err 1, " + data +
+                            "\n data:" + byteArrayToHex(data.data));
 					}
 					
 					int totalLen = data.getLength();
@@ -774,9 +788,9 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             // (short) read the response
             // this won't stall anything
             byte buf[] = new byte[inMaxPS];
-//            Log.d(TAG, "read response");
+            Log.d(TAG, "read response");
             int len = mConnection.bulkTransfer(epIn, buf ,inMaxPS , DEFAULT_TIMEOUT);//device.getInputStream(epIn).read(buf);
-//            Log.d(TAG, "received data bytes: " +len);
+            Log.d(TAG, "received data bytes: " +len);
             
             // ZLP terminated previous data?
             if (len == 0) {
@@ -1361,7 +1375,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         ObjectInfo data = new ObjectInfo(objectHandle, BaselineInitiator.this);
 
         synchronized (session) {
-            response = transact1(Command.GetObjectHandles, data, objectHandle);
+            response = transact1(Command.GetObjectInfo, data, objectHandle);
             switch (response.getCode()) {
                 case Response.OK:
                     data.parse();
@@ -1434,13 +1448,17 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
                     if (event.getCode() == getObjectAddedEventCode()) {
                         int fileHandle = event.getParam1();
-
+                        waitVendorSpecifiedFileReadySignal();
                         processFileAddEvent(fileHandle, event);
                     }
                 }
             }
         }
         Log.v("PTP_EVENT", "结束轮询");
+    }
+
+    protected void waitVendorSpecifiedFileReadySignal() {
+
     }
 
     protected int getObjectAddedEventCode() {

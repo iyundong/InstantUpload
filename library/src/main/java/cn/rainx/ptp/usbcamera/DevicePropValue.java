@@ -83,7 +83,7 @@ public class DevicePropValue extends Data
 	return getTypeName (code);
     }
 
-    static Object get (int code, Buffer buf)
+    public static Object get (int code, Buffer buf)
     {
 	Object value;
 
