@@ -126,6 +126,9 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     // 同步记录模式
     protected int syncRecordMode = SyncParams.SYNC_RECORD_MODE_REMEMBER;
 
+    // 获取get object handle 时的过滤参数 0 为全部文件
+    protected int getObjectHandleFilterParam = 0;
+
     // 运行时的线程
     protected volatile boolean pollThreadRunning = false;
 
@@ -1584,7 +1587,7 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         List<Integer> objectHandles;
         objectHandles = new ArrayList<Integer>();
         for(int sid : sids) {
-            int[] oneStorageObjectHandles = getObjectHandles(sid, 0, 0);
+            int[] oneStorageObjectHandles = getObjectHandles(sid, getObjectHandleFilterParam, 0);
             for (int h : oneStorageObjectHandles) {
                 objectHandles.add(h);
             }
@@ -1649,5 +1652,27 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         this.syncTriggerMode = syncTriggerMode;
     }
 
+    public int getSyncMode() {
+        return syncMode;
+    }
 
+    public void setSyncMode(int syncMode) {
+        this.syncMode = syncMode;
+    }
+
+    public int getSyncRecordMode() {
+        return syncRecordMode;
+    }
+
+    public void setSyncRecordMode(int syncRecordMode) {
+        this.syncRecordMode = syncRecordMode;
+    }
+
+    public int getGetObjectHandleFilterParam() {
+        return getObjectHandleFilterParam;
+    }
+
+    public void setGetObjectHandleFilterParam(int getObjectHandleFilterParam) {
+        this.getObjectHandleFilterParam = getObjectHandleFilterParam;
+    }
 }
