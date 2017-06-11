@@ -139,8 +139,9 @@ public class SonyInitiator extends BaselineInitiator {
                 if (prop.getPropertyCode() == PTP_DPC_SONY_ObjectInMemory) {
                     if ((Integer) prop.getValue() > 0x8000 ) {
                         Log.d (TAG, "SONY ObjectInMemory count change seen, retrieving file");
+                        // 对于索尼的相机，必须先执行getObjectInfo指令，无论是否需要读取文件信息
                         ObjectInfo info = getObjectInfo(0xffffc001);
-                        processFileAddEvent(0xffffc001 , null);
+                        processFileAddEvent(0xffffc001 , info);
                     } else {
                         Log.d(TAG, "current prop.value of PTP_DPC_SONY_ObjectInMemory is " + Integer.toHexString((Integer) prop.getValue()));
                     }
@@ -151,7 +152,7 @@ public class SonyInitiator extends BaselineInitiator {
         Log.v("PTP_EVENT", "结束轮询");
     }
 
-    protected void waitVendorSpecifiedFileReadySignal() {
+    protected Object waitVendorSpecifiedFileReadySignal() {
         long start = System.currentTimeMillis();
         // 5 秒的超时时间
         while (System.currentTimeMillis() - start < 15000) {
@@ -159,7 +160,7 @@ public class SonyInitiator extends BaselineInitiator {
             getAllDevicePropDesc();
             List<DevicePropDesc> props = getAllDevicePropDesc();
             if (props == null) {
-                return;
+                return null;
             }
             for (DevicePropDesc prop : props) {
                 // 	{PTP_DPC_SONY_ObjectInMemory, N_("Objects in memory")},	/* 0xD215 */
@@ -168,11 +169,11 @@ public class SonyInitiator extends BaselineInitiator {
                     if ((Integer) prop.getValue() > 0x8000 ) {
                         try {
                             ObjectInfo info = getObjectInfo(0xffffc001);
+                            return info;
                         } catch (PTPException e) {
                             e.printStackTrace();
                         }
                         Log.d (TAG, "SONY ObjectInMemory count change seen, retrieving file");
-                        return;
                     } else {
                         Log.d(TAG, "current PTP_DPC_SONY_ObjectInMemory is " + Integer.toHexString((Integer) prop.getValue()) );
                     }
@@ -180,6 +181,7 @@ public class SonyInitiator extends BaselineInitiator {
             }
         }
         Log.d(TAG, "Sony waitVendorSpecifiedFileReadySignal timeout!" );
+        return null;
     }
 
     protected void waitVendorSpecifiedFileReadySignal1() {

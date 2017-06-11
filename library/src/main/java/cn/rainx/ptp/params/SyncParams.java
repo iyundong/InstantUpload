@@ -13,4 +13,8 @@ public interface SyncParams {
 
     int SYNC_RECORD_MODE_REMEMBER   = 0; // will save
     int SYNC_RECORD_MODE_FORGET     = 1;
+
+
+    int FILE_NAME_RULE_HANDLE_ID    = 0;
+    int FILE_NAME_RULE_OBJECT_NAME  = 1;
 }

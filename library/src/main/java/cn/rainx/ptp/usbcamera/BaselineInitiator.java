@@ -31,6 +31,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import cn.rainx.ptp.db.SyncDevice;
 import cn.rainx.ptp.db.SyncDeviceManager;
@@ -38,6 +39,7 @@ import cn.rainx.ptp.interfaces.FileAddedListener;
 import cn.rainx.ptp.interfaces.FileDownloadedListener;
 import cn.rainx.ptp.interfaces.FileTransferListener;
 import cn.rainx.ptp.params.SyncParams;
+import cn.rainx.ptp.usbcamera.sony.SonyInitiator;
 
 /**
  * This initiates interactions with USB devices, supporting only
@@ -93,9 +95,10 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     protected int                    	inMaxPS;
     protected UsbEndpoint epOut;
     protected UsbEndpoint epEv;
-    protected int                       intrMaxPS;
+    protected int                        intrMaxPS;
     protected Session                	session;
     protected DeviceInfo             	info;
+    protected Random                    rand = new Random();
     public UsbDeviceConnection mConnection = null; // must be initialized first!
     	// mUsbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
 
@@ -115,7 +118,6 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     protected String fileDownloadPath;
 
 
-
     // running polling pollingThread
     Thread pollingThread = null;
 
@@ -132,6 +134,12 @@ public class BaselineInitiator extends NameFactory implements Runnable {
     // 运行时的线程
     protected volatile boolean pollThreadRunning = false;
 
+    // 使用文件名或者文件object handle ID
+    protected int fileNameRule = SyncParams.FILE_NAME_RULE_HANDLE_ID;
+
+    // 在open session 的时候，有的时候会出现相机设备已经open session 了，但是手机并不知道这个消息，这个时候需
+    // 要重新关闭之后再进行openSession操作。
+    protected boolean autoCloseSessionIfSessionAlreadyOpenWhenOpenSession = true;
 
 
     // 提供一个默认的构造函数，供子类继承时使用
@@ -262,20 +270,6 @@ public class BaselineInitiator extends NameFactory implements Runnable {
      */
     public void reset() throws PTPException 
     {
-//        try {
-/*
- * JAVA: public int controlMsg(int requestType,
-                      int request,
-                      int value,
-                      int index,
-                      byte[] data,
-                      int size,
-                      int timeout,
-                      boolean reopenOnTimeout)
-               throws USBException
-               
-Android: UsbDeviceConnection controlTransfer (int requestType, int request, int value, int index, byte[] buffer, int length, int timeout)                   	
- */		
     	if (mConnection == null) throw new PTPException("No Connection");
     	
     	mConnection.controlTransfer(
@@ -292,12 +286,6 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             );
 
             session.close();
-//        } catch (USBException e) {
-//            throw new PTPException(
-//                "Error initializing the communication with the camera (" +
-//                e.getMessage()
-//                + ")" , e);
-//        }
     }
 
     /**
@@ -320,8 +308,23 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
                     pollingThread = new Thread(this);
                     pollingThread.start();
                     return;
-                default:
-                    throw new PTPException(response.toString());
+                case Response.SessionAlreadyOpen:
+                    // 进行一次断开重试操作 ： 目前还没有测试该功能
+                    if (autoCloseSessionIfSessionAlreadyOpenWhenOpenSession){
+                        closeSession();
+                        session = new Session();
+                        command = new Command(Command.OpenSession, session,
+                                session.getNextSessionID());
+                        response = transactUnsync(command, null);
+                        if (response.getCode() == Response.OK) {
+                            session.open();
+                            pollingThread = new Thread(this);
+                            pollingThread.start();
+                        }
+                    }
+
+                 default:
+                    throw new PTPOpenSessionException(response.toString(), response.getCode());
             }
         }
     }
@@ -1451,8 +1454,13 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
                     if (event.getCode() == getObjectAddedEventCode()) {
                         int fileHandle = event.getParam1();
-                        waitVendorSpecifiedFileReadySignal();
-                        processFileAddEvent(fileHandle, event);
+                        Object singal = waitVendorSpecifiedFileReadySignal();
+                        if (singal == null) {
+                            processFileAddEvent(fileHandle, event);
+                        } else {
+                            //Sony ...
+                            processFileAddEvent(fileHandle, singal);
+                        }
                     }
                 }
             }
@@ -1460,8 +1468,8 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         Log.v("PTP_EVENT", "结束轮询");
     }
 
-    protected void waitVendorSpecifiedFileReadySignal() {
-
+    protected Object waitVendorSpecifiedFileReadySignal() {
+        return null;
     }
 
     protected int getObjectAddedEventCode() {
@@ -1598,7 +1606,6 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
     // 可以被子类覆盖，进行轮询之前的准备工作
     protected void pollListSetUp() {
 
-
     }
 
     // 可以被子类覆盖，进行轮询之后的清理工作
@@ -1622,7 +1629,38 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
         }
         if (autoDownloadFile && fileDownloadPath != null) {
             try {
-                File outputFile = new File(new File(fileDownloadPath), "tmp_" + fileHandle + ".jpg");
+                String downloadFileName;
+
+                if (fileNameRule == SyncParams.FILE_NAME_RULE_HANDLE_ID) {
+                    // 如果是索尼相机
+                    if (this instanceof SonyInitiator) {
+                        // 因为索尼always 固定的ID，所以我们需要给它一个随机id
+                        downloadFileName = getRandomFileName();
+                    } else{
+                        downloadFileName = "tmp_" + fileHandle + ".jpg";
+                    }
+                } else if (fileNameRule == SyncParams.FILE_NAME_RULE_OBJECT_NAME) {
+                    ObjectInfo objectInfo = null;
+                    if (this instanceof SonyInitiator) {
+                        // 索尼相机的ObjectInfo已经通过event传入了
+                        objectInfo = (ObjectInfo) event;
+                    } else {
+                        // 获取objectInfo
+                        objectInfo = getObjectInfo(fileHandle);
+                    }
+
+                    if (objectInfo != null && objectInfo.filename != null) {
+                        downloadFileName = objectInfo.filename;
+                    } else {
+                        // fail back to random id
+                        Log.d(TAG, "文件" + fileHandle + "无法获取ObjectInfo");
+                        downloadFileName =getRandomFileName();
+                    }
+                } else {
+                    downloadFileName = getRandomFileName();
+                }
+
+                File outputFile = new File(new File(fileDownloadPath), downloadFileName);
                 if (outputFile.exists()) {
                     outputFile.delete();
                 }
@@ -1641,6 +1679,14 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
             }
         }
         return false;
+    }
+
+    private String getRandomFileName() {
+        String downloadFileName;
+        Integer randId = rand.nextInt();
+        long  randIdLong = randId & 0xffffffffl; // to unsigned
+        downloadFileName = "tmp_" + randIdLong + ".jpg";
+        return downloadFileName;
     }
 
 
@@ -1674,5 +1720,13 @@ Android: UsbDeviceConnection controlTransfer (int requestType, int request, int 
 
     public void setGetObjectHandleFilterParam(int getObjectHandleFilterParam) {
         this.getObjectHandleFilterParam = getObjectHandleFilterParam;
+    }
+
+    public int getFileNameRule() {
+        return fileNameRule;
+    }
+
+    public void setFileNameRule(int fileNameRule) {
+        this.fileNameRule = fileNameRule;
     }
 }
