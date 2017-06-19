@@ -1392,6 +1392,23 @@ public class BaselineInitiator extends NameFactory implements Runnable {
         }
     }
 
+    // 实现类似google 的getStorageInfo 方法
+    public StorageInfo getStorageInfo(int storageId) throws PTPException {
+        Response response;
+        StorageInfo data = new StorageInfo(BaselineInitiator.this);
+
+        synchronized (session) {
+            response = transact1(Command.GetStorageInfo, data, storageId);
+            switch (response.getCode()) {
+                case Response.OK:
+                    data.parse();
+                    return data;
+                default:
+                    throw new PTPException(response.toString());
+            }
+        }
+    }
+
 
     ///////////////////////////////////////////////////////////////////
     // rainx added for poll event

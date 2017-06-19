@@ -56,7 +56,7 @@ public class DevicePropValue extends Data
     public int getTypeCode ()
 	{ return typecode; }
 
-    void parse ()
+    protected void parse()
     {
 	value = get (typecode, this);
     }

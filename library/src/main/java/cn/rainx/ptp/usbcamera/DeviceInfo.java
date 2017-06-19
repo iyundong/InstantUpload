@@ -121,7 +121,7 @@ public class DeviceInfo extends Data
 	return last;
     }
 
-    void parse ()
+    protected void parse()
     {
 	 super.parse ();
 

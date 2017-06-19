@@ -115,9 +115,9 @@ abstract public class Container extends Buffer
     }
 
     
-    void parse ()
+    protected void parse()
     {
-	offset = HDR_LEN;
+		offset = HDR_LEN;
     }
 
     /** Returns the overall length of this data block, including header. */

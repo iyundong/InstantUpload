@@ -35,8 +35,6 @@ package cn.rainx.ptp.usbcamera;
 //
 
 
-import android.widget.TextView;
-
 import java.io.PrintStream;
 import java.util.Vector;
 
@@ -67,7 +65,7 @@ public class DevicePropDesc extends Data
 
     public DevicePropDesc (NameFactory f) { super (f); }
 
-    public void parse ()
+    public void parse()
     {
 	super.parse ();
 

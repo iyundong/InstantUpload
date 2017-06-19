@@ -54,6 +54,6 @@ public class OutputStreamData extends Data {
     }
 
     @Override
-    final void parse() {
+    protected final void parse() {
     }
 }

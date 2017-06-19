@@ -42,7 +42,7 @@ public class StorageInfo extends Data
 
     StorageInfo (NameFactory f) { super (f); }
 
-    void parse ()
+    protected void parse()
     {
 	super.parse ();
 
@@ -192,4 +192,37 @@ public class StorageInfo extends Data
 		tv.append ("Volume Label: " + volumeLabel);
 	}
     }
+
+
+	public int getStorageType() {
+		return storageType;
+	}
+
+	public int getFilesystemType() {
+		return filesystemType;
+	}
+
+	public int getAccessCapability() {
+		return accessCapability;
+	}
+
+	public long getMaxCapacity() {
+		return maxCapacity;
+	}
+
+	public long getFreeSpaceInBytes() {
+		return freeSpaceInBytes;
+	}
+
+	public int getFreeSpaceInImages() {
+		return freeSpaceInImages;
+	}
+
+	public String getStorageDescription() {
+		return storageDescription;
+	}
+
+	public String getVolumeLabel() {
+		return volumeLabel;
+	}
 }

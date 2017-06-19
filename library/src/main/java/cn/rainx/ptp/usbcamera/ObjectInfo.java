@@ -201,7 +201,7 @@ public class ObjectInfo extends Data
 	return isIn () ? super.getLength () : data.length;
     }
 
-    void parse ()
+    protected void parse()
     {
 	super.parse ();
 

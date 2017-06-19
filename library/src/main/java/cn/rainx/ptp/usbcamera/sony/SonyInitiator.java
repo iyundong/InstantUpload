@@ -35,6 +35,8 @@ public class SonyInitiator extends BaselineInitiator {
     protected int PTP_OC_SONY_GetDevicePropdesc = 0x9203;
     protected int PTP_OC_SONY_GetSDIOGetExtDeviceInfo = 0x9202;
 
+    SonyExtDeviceInfo sonyExtDeviceInfo = null;
+
     /**
      * Constructs a class driver object, if the device supports
      * operations according to Annex D of the PTP specification.
@@ -286,9 +288,16 @@ public class SonyInitiator extends BaselineInitiator {
     }
 
     private void sendSonyGetExtDeviceInfoCommand() {
-        Data data = new Data(this);
+        SonyExtDeviceInfo data = new SonyExtDeviceInfo(this);
         try {
             transact1(PTP_OC_SONY_GetSDIOGetExtDeviceInfo, data, 0xc8);
+            try {
+                data.parse();
+                sonyExtDeviceInfo = data;
+                Log.d(TAG, sonyExtDeviceInfo.toString());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         } catch (PTPException e) {
             e.printStackTrace();
         }
