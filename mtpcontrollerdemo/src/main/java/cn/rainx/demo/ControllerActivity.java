@@ -24,12 +24,14 @@ import java.io.File;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import cn.rainx.exif.ExifUtils;
 import cn.rainx.ptp.interfaces.FileDownloadedListener;
 import cn.rainx.ptp.interfaces.FileTransferListener;
 import cn.rainx.ptp.params.SyncParams;
@@ -134,6 +136,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         ((Button) findViewById(R.id.getAllObjects)).setOnClickListener(this);
         ((Button) findViewById(R.id.transferObject)).setOnClickListener(this);
         ((Button) findViewById(R.id.getObjectInfo)).setOnClickListener(this);
+        ((Button) findViewById(R.id.updateExif)).setOnClickListener(this);
 
         etPtpObjectName = (EditText) findViewById(R.id.ptpObject);
         etPtpObjectInfoName = (EditText) findViewById(R.id.ptpObjectInfo);
@@ -207,6 +210,9 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                 break;
             case R.id.transferObject:
                 transferObject();
+                break;
+            case R.id.updateExif:
+                updateExif();
                 break;
         }
     }
@@ -362,6 +368,16 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         }
     }
 
+    // 更新图片的exif信息
+    private void updateExif() {
+        log("getExternalFilesDir is " + getExternalFilesDir(null).getAbsolutePath());
+        final String filePath = getExternalFilesDir(null).getAbsolutePath() + "/hello.jpg";
+        // 密云	116.85	减0小时12分36秒	40.37
+        boolean ret = ExifUtils.updateExifLocation(filePath, 40.37d, 116.85, new Date());
+        log("update ret value is " + ret);
+    }
+
+
     void performConnect(UsbDevice device) {
         UsbManager usbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
 
@@ -404,6 +420,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
             log("设备已经连接，无需重联");
         }
     }
+
 
 
     // searches for an interface on the given USB device, returns only class 6  // From androiddevelopers ADB-Test

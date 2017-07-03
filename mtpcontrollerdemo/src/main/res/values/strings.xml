@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">MtpControllerDemo</string>
+    <string name="update_exif">更新exif信息</string>
 </resources>
