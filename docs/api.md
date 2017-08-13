@@ -358,48 +358,26 @@ public interface FileAddedListener {
 
 - 获取所有的storageId以及storage中的所有文件
 
-  ```java public void getAllObjects() {
+  ```java
+  int[] sids = bi.getStorageIds();
+  for (int sid : sids) {
+      log("--------");
+      log("检查storage id: " + sid);
+      log("--------");
+      int[] objectHandles = bi.getObjectHandles(sid, 0, 0);
+      log("获取sid (" + sid + ")中的对象句柄");
+      List<String> strHandleList = new ArrayList<String>(objectHandles.length);
 
-  ```
-  if (isOpenConnected && bi != null) {
-      log("准备获取objects信息");
-      new Thread(new Runnable() {
-          @Override
-          public void run() {
-              try {
-                  int[] sids = bi.getStorageIds();
-                  for (int sid : sids) {
-                      log("--------");
-                      log("检查storage id: " + sid);
-                      log("--------");
-                      int[] objectHandles = bi.getObjectHandles(sid, 0, 0);
-                      log("获取sid (" + sid + ")中的对象句柄");
-                      List<String> strHandleList = new ArrayList<String>(objectHandles.length);
-
-                      for (int objectHandle : objectHandles) {
-                          strHandleList.add(objectHandle + "");
-                      }
-                      log(TextUtils.join(",", strHandleList));
-                  }
-              } catch (PTPException e) {
-                  e.printStackTrace();
-              }
-          }
-      }).start();
+      for (int objectHandle : objectHandles) {
+          strHandleList.add(objectHandle + "");
+      }
+      log(TextUtils.join(",", strHandleList));
   ```
 
-```
-  } else {
-      log("mtp/ptp 设备未连接");
-  }
-```
+  - 获取对象（文件）的信息
 
-}
-
-````
- - 获取对象（文件）的信息
- ```java
- public void getObjectInfo() {
+    ```java
+    public void getObjectInfo() {
 
     try {
         if (isOpenConnected) {
@@ -424,8 +402,8 @@ public interface FileAddedListener {
     }catch (PTPException e) {
         e.printStackTrace();
     }
-}
-````
+    }
+    ```
 
 - 传输单个文件
 
