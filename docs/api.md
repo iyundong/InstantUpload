@@ -273,52 +273,44 @@ void performConnect(UsbDevice device) {
 
 8. `bi.openSession`, 这个操作非常重要，系统将开启一个PTP Session,除此之外，会开启一个线程作为即使上传同步的工作线程。
 
-9. 在连接结束时，我们需要调用`bi.close()`关闭bi实例，已进行工作线程的终止以及内存的清理等工作。通常我们会在 USB设备detach的时候或者Activity结束的时候进行此操作 ```java
+9. 在连接结束时，我们需要调用`bi.close()`关闭bi实例，已进行工作线程的终止以及内存的清理等工作。通常我们会在 USB设备detach的时候或者Activity结束的时候进行此操作
+
+  ```java
 
   @Override protected void onDestroy() { super.onDestroy(); unregisterReceiver(mUsbReceiver); try {
 
-  ```
   unregisterReceiver(usbPermissionReceiver);
-  ```
 
   } catch (Exception e) {
 
-  ```
   // 如果之前没有注册, 则会抛出异常
   e.printStackTrace();
-  ```
 
   } detachDevice(); }
-
-/**
-
-- usb插拔接收器 */ BroadcastReceiver mUsbReceiver = new BroadcastReceiver() { public void onReceive(Context context, Intent intent) {
-
-  ```
-   String action = intent.getAction();
-   if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
-       log("usb设备已接入");
-       isOpenConnected = false;
-   } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
-       log("usb设备已拔出");
-       isOpenConnected = false;
-       detachDevice();
-   }
   ```
 
-  } };
+```java
+/**- usb插拔接收器 */
+BroadcastReceiver mUsbReceiver = new BroadcastReceiver() { public void onReceive(Context context, Intent intent) {
 
-  void detachDevice() { if (bi != null) {
+  String action = intent.getAction();
+  if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) { log("usb设备已接入"); isOpenConnected = false; } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) { log("usb设备已拔出"); isOpenConnected = false; detachDevice(); }
 
-  ```
-     try {
-         bi.close();
-     } catch (PTPException e) {
-         e.printStackTrace();
-     }
-  ```
+  }
+};
+```
 
-  } } ```
+```java
+void detachDevice() { if (bi != null) {
+
+ try {
+     bi.close();
+ } catch (PTPException e) {
+     e.printStackTrace();
+ }
+
+  } }
+```
 
 以上的步骤即可完成即使上传系统的全部配置，通常情况下，在下面介绍一下如何使用一些手工的指令做一些更细粒度的控制。
 
@@ -374,9 +366,9 @@ public interface FileAddedListener {
       log(TextUtils.join(",", strHandleList));
   ```
 
-  - 获取对象（文件）的信息
+- 获取对象（文件）的信息
 
-    ```java
+  ```java
     public void getObjectInfo() {
 
     try {
@@ -403,7 +395,7 @@ public interface FileAddedListener {
         e.printStackTrace();
     }
     }
-    ```
+  ```
 
 - 传输单个文件
 
