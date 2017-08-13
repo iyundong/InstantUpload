@@ -9,7 +9,7 @@ import cn.rainx.ptp.usbcamera.Container;
 
 public interface FileAddedListener {
     /**
-     * 当相机有新的文件被添加的时候出发
+     * 当相机有新的文件被添加的时候触发
      * @param bi BaselineInitiator的子类
      * @param fileHandle 文件句柄
      * @param data 对应的Event（尼康）或者Response （佳能）数据
