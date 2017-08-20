@@ -45,3 +45,20 @@ exception                | text         | 产生的异常
 traceback                | text         | 调用堆栈
 fileinfo                 | text         | 如果当前正在传输文件，则记录文件的一些信息
 created_at               | float        | 记录创建时间
+
+## 设备信息收集
+
+表名`iu_device_info_tracker`
+
+字段                       | 类型           | 备注
+------------------------ | ------------ | ----------------------------------------
+id                       | integer      | 自增
+vender_id                | integer      |
+device_id                | integer      |
+serial                   | varchar(255) | 设备串号
+android_device_unique_id | varchar(255) | 安卓设备唯一编号
+android_user_unique_id   | integer      | 使用用户的唯一id编号
+android_device_info      | varchar(255) | Build.BRAND + Build.DEVICE + Build.MODEL
+android_os_ver           | integer      | 操作系统版本
+device_info              | text         | 设备信息
+text                     | created_at   | float                                    | 记录创建时间
