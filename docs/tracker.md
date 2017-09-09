@@ -59,6 +59,7 @@ serial                   | varchar(255) | 设备串号
 android_device_unique_id | varchar(255) | 安卓设备唯一编号
 android_user_unique_id   | integer      | 使用用户的唯一id编号
 android_device_info      | varchar(255) | Build.BRAND + Build.DEVICE + Build.MODEL
+lib_version              | integer      | 所使用的库的版本
 android_os_ver           | integer      | 操作系统版本
-device_info              | text         | 设备信息                                     |
-created_at               | float        | 记录创建时间
+
+device_info | text | 设备信息 | created_at | float | 记录创建时间

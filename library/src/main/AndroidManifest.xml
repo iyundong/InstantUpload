@@ -2,8 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="mtp.rainx.cn.mtpcontroller">
 
+
     <!-- 作为  USB HOST 设备 -->
     <uses-feature android:name="android.hardware.usb.host" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -13,6 +15,8 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         >
+
+        <meta-data android:value="1" android:name="iu_libversion"/>
 
     </application>
 
