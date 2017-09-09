@@ -67,4 +67,13 @@ public class ExampleInstrumentedTest {
         IuTracker tracker = IuTracker.getInstance("http://192.168.6.150:8000");
         tracker.reportBug(baseinfo, null, "PTPException", "....traceback....", "filename : xxxx");
     }
+
+    @Test
+    public void testException() {
+        Exception e = new Exception("hello");
+        Log.v(TAG, e.toString());
+        Log.v(TAG, e.getMessage());
+        Log.v(TAG, e.getClass().toString());
+
+    }
 }

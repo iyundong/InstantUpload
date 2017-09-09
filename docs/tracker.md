@@ -63,3 +63,33 @@ lib_version              | integer      | 所使用的库的版本
 android_os_ver           | integer      | 操作系统版本
 
 device_info | text | 设备信息 | created_at | float | 记录创建时间
+
+## TraceBack获取
+
+<https://stackoverflow.com/questions/1069066/get-current-stack-trace-in-java>
+
+- Arrays.toString(Thread.currentThread().getStackTrace()); simple enough. –
+- To print it nicely you can use apache StringUtils: StringUtils.join(currentThread().getStackTrace(), "\n");
+- String fullStackTrace = org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e);
+
+## Exception获取
+
+- String errorMessage = e.getMessage();
+- e.toString()
+
+```java
+Exception e = new Exception("hello");
+Log.v(TAG, e.toString());
+Log.v(TAG, e.getMessage());
+Log.v(TAG, e.getClass().toString());
+```
+
+result
+
+```java
+09-09 18:59:22.779 10394-10409/cn.rainx.demo I/TestRunner: started: testException(cn.rainx.demo.ExampleInstrumentedTest)
+09-09 18:59:22.781 10394-10409/cn.rainx.demo V/cn.rainx.demo.ExampleInstrumentedTest: java.lang.Exception: hello
+09-09 18:59:22.781 10394-10409/cn.rainx.demo V/cn.rainx.demo.ExampleInstrumentedTest: hello
+09-09 18:59:22.781 10394-10409/cn.rainx.demo V/cn.rainx.demo.ExampleInstrumentedTest: class java.lang.Exception
+09-09 18:59:22.781 10394-10409/cn.rainx.demo I/TestRunner: finished: testException(cn.rainx.demo.ExampleInstrumentedTest)
+```
