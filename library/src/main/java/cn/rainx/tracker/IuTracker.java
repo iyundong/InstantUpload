@@ -29,12 +29,17 @@ public class IuTracker {
 
     public static final String TAG = IuTracker.class.getSimpleName();
 
-    private boolean bugTrackerEnabled = false;
-    private boolean perfTrackerEnabled = false;
-    private boolean deviceInfoTrackerEnabled = false;
+    private boolean bugTrackerEnabled = true;
+    private boolean perfTrackerEnabled = true;
+    private boolean deviceInfoTrackerEnabled = true;
     private String restBaseUri;
     private static volatile IuTracker _instance= null;
 
+    /**
+     * 获取单例
+     * @param restBaseUri rest服务的基础uri 如 http://127.0.0.1:8000
+     * @return
+     */
     public static synchronized IuTracker getInstance(String restBaseUri) {
         if (_instance == null) {
             _instance = new IuTracker(restBaseUri);
@@ -48,6 +53,7 @@ public class IuTracker {
 
     private IuTracker(String restBaseUri) {
         this.restBaseUri = restBaseUri;
+
     }
 
     public void setBugTrackerEnabled(boolean bugTrackerEnabled) {
@@ -71,10 +77,18 @@ public class IuTracker {
     }
 
 
+    /**
+     * 向服务器报告设备信息，一个客户端只会报告一次
+     * @param baseInfo
+     */
     public void reportDeviceInfo(BaseInfo baseInfo) {
         // need implement
         // 1 持久化确保改接口对于一个手机只被运行一次
         // 检测是否已经report 过
+
+        if (!deviceInfoTrackerEnabled) {
+            return;
+        }
 
         final String key = "Already_Reported_DeviceInfo";
 
@@ -105,8 +119,23 @@ public class IuTracker {
 
     }
 
+    /**
+     * 向服务器报告文件传输速度
+     * @param baseInfo 基础信息
+     * @param initiator USB Initiator 设备
+     * @param filesize 文件大小
+     * @param startTs 开始时间
+     * @param endTs 结束时间
+     * @param costTs 消耗时间
+     */
     public void reportPerf(BaseInfo baseInfo, BaselineInitiator initiator,
                            int filesize, float startTs, float endTs, float costTs) {
+
+
+        if (!perfTrackerEnabled) {
+            return;
+        }
+
         String url = restBaseUri + "/perf_tracker/";
 
         RequestParams params =  baseInfo.getParams();
@@ -139,8 +168,20 @@ public class IuTracker {
 
     }
 
+    /**
+     * 向服务器报告bug
+     * @param baseInfo 基础信息
+     * @param initiator USB Initiator 设备
+     * @param exception 异常信息
+     * @param traceback 调用堆栈
+     * @param fileinfo 正在传输的文件信息
+     */
     public void reportBug(BaseInfo baseInfo, BaselineInitiator initiator, String exception,
                           String traceback, String fileinfo) {
+
+        if (!bugTrackerEnabled) {
+            return;
+        }
 
         String url = restBaseUri + "/bug_tracker/";
         RequestParams params =  baseInfo.getParams();
@@ -181,10 +222,5 @@ public class IuTracker {
             return syncHttpClient;
         return asyncHttpClient;
     }
-
-
-
-
-
 
 }
