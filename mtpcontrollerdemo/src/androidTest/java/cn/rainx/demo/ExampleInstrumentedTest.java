@@ -49,14 +49,14 @@ public class ExampleInstrumentedTest {
     @Test
     public void testReportBaseInfo() {
         BaseInfo baseinfo = getBaseInfo();
-        IuTracker tracker = IuTracker.getInstance("http://192.168.6.150:8000");
+        IuTracker tracker = IuTracker.getInstance("http://10.63.255.84:8000");
         tracker.reportDeviceInfo(baseinfo);
     }
 
     @Test
     public void testReportPerf() {
         BaseInfo baseinfo = getBaseInfo();
-        IuTracker tracker = IuTracker.getInstance("http://192.168.6.150:8000");
+        IuTracker tracker = IuTracker.getInstance("http://10.63.255.84:8000");
         tracker.reportPerf(baseinfo, null, 1024 * 1024 , System.currentTimeMillis(),
                 System.currentTimeMillis() + 10, 10);
     }
@@ -64,7 +64,7 @@ public class ExampleInstrumentedTest {
     @Test
     public void testReportBug() {
         BaseInfo baseinfo = getBaseInfo();
-        IuTracker tracker = IuTracker.getInstance("http://192.168.6.150:8000");
+        IuTracker tracker = IuTracker.getInstance("http://10.63.255.84:8000");
         tracker.reportBug(baseinfo, null, "PTPException", "....traceback....", "filename : xxxx");
     }
 

@@ -1648,6 +1648,20 @@ public class BaselineInitiator extends NameFactory implements Runnable {
             try {
                 String downloadFileName;
 
+                ObjectInfo objectInfo = null;
+
+                if (this instanceof SonyInitiator) {
+                    // 索尼相机的ObjectInfo已经通过event传入了
+                    objectInfo = (ObjectInfo) event;
+                } else {
+                    // 获取objectInfo
+                    objectInfo = getObjectInfo(fileHandle);
+                }
+
+                if (objectInfo.associationType == 1) { // skip folder
+                    return true;
+                }
+
                 if (fileNameRule == SyncParams.FILE_NAME_RULE_HANDLE_ID) {
                     // 如果是索尼相机
                     if (this instanceof SonyInitiator) {
@@ -1657,15 +1671,6 @@ public class BaselineInitiator extends NameFactory implements Runnable {
                         downloadFileName = "tmp_" + fileHandle + ".jpg";
                     }
                 } else if (fileNameRule == SyncParams.FILE_NAME_RULE_OBJECT_NAME) {
-                    ObjectInfo objectInfo = null;
-                    if (this instanceof SonyInitiator) {
-                        // 索尼相机的ObjectInfo已经通过event传入了
-                        objectInfo = (ObjectInfo) event;
-                    } else {
-                        // 获取objectInfo
-                        objectInfo = getObjectInfo(fileHandle);
-                    }
-
                     if (objectInfo != null && objectInfo.filename != null) {
                         downloadFileName = objectInfo.filename;
                     } else {

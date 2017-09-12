@@ -93,3 +93,7 @@ result
 09-09 18:59:22.781 10394-10409/cn.rainx.demo V/cn.rainx.demo.ExampleInstrumentedTest: class java.lang.Exception
 09-09 18:59:22.781 10394-10409/cn.rainx.demo I/TestRunner: finished: testException(cn.rainx.demo.ExampleInstrumentedTest)
 ```
+
+## tracker 记录设备信息
+
+每次device 信息report 应该是根据 手机uuid + 相机serial 来唯一标识确保只上传一次。
