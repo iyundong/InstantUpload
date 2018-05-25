@@ -9,9 +9,13 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.mtp.MtpConstants;
+import android.mtp.MtpDevice;
+import android.mtp.MtpDeviceInfo;
+import android.mtp.MtpObjectInfo;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
@@ -19,29 +23,17 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 import cn.rainx.exif.ExifUtils;
-import cn.rainx.ptp.interfaces.FileDownloadedListener;
-import cn.rainx.ptp.interfaces.FileTransferListener;
-import cn.rainx.ptp.params.SyncParams;
-import cn.rainx.ptp.usbcamera.BaselineInitiator;
-import cn.rainx.ptp.usbcamera.DeviceInfo;
-import cn.rainx.ptp.usbcamera.InitiatorFactory;
-import cn.rainx.ptp.usbcamera.ObjectInfo;
-import cn.rainx.ptp.usbcamera.PTPException;
-import cn.rainx.ptp.usbcamera.sony.SonyInitiator;
-
 public class ControllerActivity extends AppCompatActivity implements View.OnClickListener{
 
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
@@ -61,15 +53,13 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
     CancellationSignal signal;
 
-    private BaselineInitiator bi;
-
     // 接口
     protected UsbInterface 				intf;
 
     protected UsbDeviceConnection mConnection = null;
 
-
-
+    private MtpClient mClient;
+    private MtpDevice mDevice;
     /**
      * usb插拔接收器
      */
@@ -165,13 +155,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
 
     void detachDevice() {
-        if (bi != null) {
-            try {
-                bi.close();
-            } catch (PTPException e) {
-                e.printStackTrace();
-            }
-        }
+        mClient.close();
     }
 
 
@@ -223,7 +207,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         HashMap<String, UsbDevice> deviceList = manager.getDeviceList();
         Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
         int i = 0;
-        while(deviceIterator.hasNext()){
+        while (deviceIterator.hasNext()) {
             i++;
             UsbDevice device = deviceIterator.next();
             log("--------");
@@ -246,27 +230,35 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         if (isOpenConnected) {
             log("准备获取ptp信息v2");
             try {
-                DeviceInfo deviceInfo = bi.getDeviceInfo();
-                log("device info:" + deviceInfo.toString());
-            } catch (PTPException e) {e.printStackTrace();}
+                MtpDeviceInfo deviceInfo = mDevice.getDeviceInfo();
+                String manufacture = deviceInfo.getManufacturer();
+                String model = deviceInfo.getModel();
+                String version = deviceInfo.getVersion();
+                String serialNo = deviceInfo.getSerialNumber();
+
+                log(String.format("device info: %s %s ver: %s sn: %s", manufacture, model, version, serialNo));
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         } else {
             log("mtp/ptp 设备未连接v2");
         }
     }
 
     public void getAllObjects() {
-        if (isOpenConnected && bi != null) {
+        if (isOpenConnected && mDevice != null) {
             log("准备获取objects信息");
             new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        int[] sids = bi.getStorageIds();
+                        int[] sids = mDevice.getStorageIds();
                         for (int sid : sids) {
                             log("--------");
                             log("检查storage id: " + sid);
                             log("--------");
-                            int[] objectHandles = bi.getObjectHandles(sid, 0, 0);
+                            int[] objectHandles = mDevice.getObjectHandles(sid, 0, 0);
                             log("获取sid (" + sid + ")中的对象句柄");
                             List<String> strHandleList = new ArrayList<String>(objectHandles.length);
 
@@ -275,7 +267,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                             }
                             log(TextUtils.join(",", strHandleList));
                         }
-                    } catch (PTPException e) {
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
@@ -299,17 +291,23 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
                 log("准备获取信息");
 
-                ObjectInfo info = bi.getObjectInfo(Integer.valueOf(oh));
+                MtpObjectInfo info = mDevice.getObjectInfo(Integer.valueOf(oh));
                 if (info != null) {
+                    String fileName = info.getName();
+                    int height = info.getImagePixHeight();
+                    int width = info.getImagePixWidth();
+                    int type = info.getAssociationType();
+                    String displayString;
+                    if (type == MtpConstants.ASSOCIATION_TYPE_GENERIC_FOLDER) {
+                        displayString = String.format("目录: %s", fileName);
+                    } else {
+                        displayString = String.format(Locale.US, "文件: %s, width: %d, height: %d", fileName, width, height);
+                    }
 
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    PrintStream ps = new PrintStream(baos);
-                    info.dump(ps);
-                    String content = new String(baos.toByteArray(), StandardCharsets.UTF_8);
-                    log(content);
+                    log(displayString);
                 }
             }
-        }catch (PTPException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -330,7 +328,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                     String outputFilePath = tmp.getPath();
                     log("准备传输数据");
                     try {
-                        boolean transfer = bi.importFile(ohandle, outputFilePath);
+                        boolean transfer = mDevice.importFile(ohandle, outputFilePath);
 
                         if (transfer) {
                             log("传输成功 : " + outputFilePath);
@@ -379,39 +377,27 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
 
     void performConnect(UsbDevice device) {
-        UsbManager usbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
+        if (mClient == null) {
+            mClient = new MtpClient(getApplicationContext());
+        }
 
-        if( !isOpenConnected ){
+
+        if (!isOpenConnected) {
             try {
-                bi = InitiatorFactory.produceInitiator(device, usbManager);
-                bi.getClearStatus(); // ?????
-                bi.setSyncTriggerMode(SyncParams.SYNC_TRIGGER_MODE_POLL_LIST);
-                if (bi instanceof SonyInitiator) {
-                    // 索尼只能支持event 模式
-                    bi.setSyncTriggerMode(SyncParams.SYNC_TRIGGER_MODE_EVENT);
+
+                List<MtpDevice> mtpDeviceList = mClient.getDeviceList();
+
+                for (MtpDevice currentDevice : mtpDeviceList) {
+                    if (currentDevice.getDeviceName().equals(device.getDeviceName())) {
+                        mDevice = currentDevice;
+                    }
                 }
-                bi.openSession();
+
+                log("已连接到 " + mDevice.getDeviceName());
 
                 isOpenConnected = true;
 
-
-
-                bi.setFileDownloadPath(getExternalCacheDir().getAbsolutePath());
-                bi.setFileTransferListener(new FileTransferListener() {
-                    @Override
-                    public void onFileTranster(BaselineInitiator bi, int fileHandle, int totalByteLength, int transterByteLength) {
-                        //Log.v(TAG, "[filehandle]" + fileHandle + ",totalByte:" + totalByteLength + ",transfter:" + transterByteLength);
-                    }
-                });
-
-                bi.setFileDownloadedListener(new FileDownloadedListener() {
-                    @Override
-                    public void onFileDownloaded(BaselineInitiator bi, int fileHandle, File localFile, long timeduring) {
-                        log("file ("  + fileHandle + ") downloaded at " + localFile.getAbsolutePath() + ",time: " + timeduring + "ms");
-                    }
-                });
-
-            } catch (PTPException e) {
+            } catch (Exception e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
                 log(e.toString());
