@@ -1,11 +1,17 @@
 package cn.rainx.exif;
 
-import android.media.ExifInterface;
+import android.location.Location;
+import android.support.media.ExifInterface;
 import android.util.Log;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
+
+import static android.support.media.ExifInterface.TAG_DATETIME;
+import static android.support.media.ExifInterface.TAG_SUBSEC_TIME;
+
 
 /**
  * Created by rainx on 2017/7/2.
@@ -13,7 +19,8 @@ import java.util.Date;
 
 public class ExifUtils {
 
-    public static final String TAG= "ExifUtils";
+    public static final String TAG = "ExifUtils";
+    private static SimpleDateFormat sFormatter = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US);
 
     // 使用exifinterface 更新exif信息，根据安卓版本的不同，可以支持jpeg 和部分 raw 格式，如果更新失败，返回false
     /*
@@ -36,39 +43,113 @@ public class ExifUtils {
      */
 
     /**
-     *
-     * @param filePath 图片文件路径
-     * @param latitude 纬度
-     * @param longitude 经度
-     * @param date 更新时间
-     * @return
+     * @param filePath 文件路径
+     * @param location LocationManager返回格式的GPS信息
      */
-    public static boolean updateExifLocation(String filePath, double latitude, double longitude, Date date) {
-        ExifInterface exif = null;
+    public static boolean updateExifGPS(String filePath, Location location) {
+        // handle gps
         try {
-            // handle gps
-            exif = new ExifInterface(filePath);
-            exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, GPS.convert(latitude));
-            exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, GPS.latitudeRef(latitude));
-            exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, GPS.convert(longitude));
-            exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, GPS.longitudeRef(longitude));
-
-            // handle datetime
-            SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss");
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy:MM:dd");
-            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
-            exif.setAttribute("DateTimeOriginal", dateTimeFormat.format(date));
-            exif.setAttribute("DateTimeDigitized", dateTimeFormat.format(date));
-            exif.setAttribute(ExifInterface.TAG_DATETIME,dateTimeFormat.format(date));
-            exif.setAttribute(ExifInterface.TAG_GPS_DATESTAMP,dateFormat.format(date));
-            exif.setAttribute(ExifInterface.TAG_GPS_TIMESTAMP,timeFormat.format(date));
-
+            ExifInterface exif = new ExifInterface(filePath);
+            exif.setGpsInfo(location);
             exif.saveAttributes();
             return true;
         } catch (IOException e) {
             e.printStackTrace();
-            Log.d(TAG, "can handle this file format, file is : " + filePath);
+            Log.d(TAG, "can not handle this file format, file is : " + filePath);
             return false;
+        }
+    }
+
+    public static String printExifSummary(String filePath) {
+        try {
+            ExifInterface exif = new ExifInterface(filePath);
+
+            return "TAG_GPS_LATITUDE: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_LATITUDE) +
+                    "\n" +
+                    "TAG_GPS_LATITUDE_REF: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_LATITUDE_REF) +
+                    "\n" +
+                    "TAG_GPS_LONGITUDE: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_LONGITUDE) +
+                    "\n" +
+                    "TAG_GPS_LONGITUDE_REF: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF) +
+                    "\n" +
+                    "TAG_GPS_ALTITUDE: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_ALTITUDE) +
+                    "\n" +
+                    "TAG_GPS_ALTITUDE_REF: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF) +
+                    "\n" +
+                    "TAG_DATETIME_ORIGINAL: " +
+                    exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) +
+                    "\n" +
+                    "TAG_DATETIME_DIGITIZED: " +
+                    exif.getAttribute(ExifInterface.TAG_DATETIME_DIGITIZED) +
+                    "\n" +
+                    "TAG_DATETIME: " +
+                    exif.getAttribute(TAG_DATETIME) +
+                    "\n" +
+                    "TAG_GPS_DATESTAMP: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_DATESTAMP) +
+                    "\n" +
+                    "TAG_GPS_TIMESTAMP: " +
+                    exif.getAttribute(ExifInterface.TAG_GPS_TIMESTAMP) +
+                    "\n";
+        } catch (IOException e) {
+            e.printStackTrace();
+            Log.d(TAG, "can not handle this file format, file is : " + filePath);
+            return "";
+        }
+    }
+
+    public boolean updatePhotoDateTime(String filePath, Date date) {
+        try {
+            ExifInterface exif = new ExifInterface(filePath);
+            long sub = date.getTime() % 1000;
+            exif.setAttribute(TAG_DATETIME, sFormatter.format(date));
+            exif.setAttribute(TAG_SUBSEC_TIME, Long.toString(sub));
+            exif.saveAttributes();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean updateLatlng(String filePath, double latitude, double longitude) {
+        try {
+            ExifInterface exif = new ExifInterface(filePath);
+            exif.setLatLong(latitude, longitude);
+            exif.saveAttributes();
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public Date getDateTime(String filePath) {
+        try {
+            ExifInterface exif = new ExifInterface(filePath);
+            String dateString = exif.getAttribute(TAG_DATETIME);
+            return sFormatter.parse(dateString);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public double[] getLatLong(String filePath){
+        //The first element is the latitude,
+        //and the second element is the longitude
+        try {
+            ExifInterface exif = new ExifInterface(filePath);
+            return exif.getLatLong();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
     }
 }

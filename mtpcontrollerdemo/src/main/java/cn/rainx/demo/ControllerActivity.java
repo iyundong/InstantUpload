@@ -1,20 +1,26 @@
 package cn.rainx.demo;
 
+import android.Manifest;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.location.Location;
 import android.mtp.MtpConstants;
 import android.mtp.MtpDevice;
 import android.mtp.MtpDeviceInfo;
 import android.mtp.MtpObjectInfo;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.util.Log;
@@ -22,10 +28,10 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -37,6 +43,7 @@ import cn.rainx.exif.ExifUtils;
 public class ControllerActivity extends AppCompatActivity implements View.OnClickListener{
 
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
+    private static final int REQUEST_CODE_REQUEST_PERMISSION = 654;
 
     // log 显示区域
     private EditText etLogPanel;
@@ -52,6 +59,9 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
     EditText etPtpObjectInfoName;
 
     CancellationSignal signal;
+
+    //最后传输的文件名
+    String lastFilePath;
 
     // 接口
     protected UsbInterface 				intf;
@@ -133,7 +143,8 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
         etLogPanel = (EditText) findViewById(R.id.logPanel);
         etLogPanel.setGravity(Gravity.BOTTOM);
-
+        //初始化位置工具
+        CheckLocationPermission();
         log("程序初始化完成");
 
         registerUsbDeviceReceiver();
@@ -150,6 +161,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
             // 如果之前没有注册, 则会抛出异常
             e.printStackTrace();
         }
+        LocationUtils.getInstance(this).removeLocationUpdatesListener();
         detachDevice();
     }
 
@@ -332,6 +344,9 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
                         if (transfer) {
                             log("传输成功 : " + outputFilePath);
+                            String fileExif = ExifUtils.printExifSummary(outputFilePath);
+                            lastFilePath = outputFilePath;
+                            log("文件信息 :\n" + fileExif);
                         } else {
                             log("传输失败");
                         }
@@ -368,10 +383,17 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
     // 更新图片的exif信息
     private void updateExif() {
-        log("getExternalFilesDir is " + getExternalFilesDir(null).getAbsolutePath());
-        final String filePath = getExternalFilesDir(null).getAbsolutePath() + "/hello.jpg";
-        // 密云	116.85	减0小时12分36秒	40.37
-        boolean ret = ExifUtils.updateExifLocation(filePath, 40.37d, 116.85, new Date());
+        log("getExternalFilesDir is " + lastFilePath);
+        Location location = LocationUtils.getInstance(this).showLocation();
+        boolean ret = false;
+        if (TextUtils.isEmpty(lastFilePath)) {
+            log("您还没有传输文件");
+        } else if (null == location) {
+            log("尚未取得位置信息");
+        } else {
+            ret = ExifUtils.updateExifGPS(lastFilePath, location);
+        }
+
         log("update ret value is " + ret);
     }
 
@@ -443,4 +465,32 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
             sb.append(String.format("%02x", b));
         return sb.toString();
     }
+
+    private void CheckLocationPermission() {
+        int hasCoarseLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION);
+        int hasFineLocation = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION);
+        if (hasCoarseLocation != PackageManager.PERMISSION_GRANTED || hasFineLocation != PackageManager.PERMISSION_GRANTED) {
+
+            //没有权限,判断是否会弹权限申请对话框
+            boolean shouldShowCoarse = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION);
+            boolean shouldShowFine = ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION);
+            if (shouldShowCoarse || shouldShowFine) {
+                //申请权限
+                ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_CODE_REQUEST_PERMISSION);
+            } else {
+                //被禁止显示弹窗
+                Toast.makeText(this,"请启用位置权限",Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CODE_REQUEST_PERMISSION) {
+            LocationUtils.getInstance(this);
+        } else {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+    }
+
 }
