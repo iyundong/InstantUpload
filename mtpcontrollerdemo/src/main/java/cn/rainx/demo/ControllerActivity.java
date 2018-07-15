@@ -309,11 +309,26 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                     int height = info.getImagePixHeight();
                     int width = info.getImagePixWidth();
                     int type = info.getAssociationType();
+                    int protectionStatus = info.getProtectionStatus();
+                    String protectionLevel = "NONE";
+                    switch (protectionStatus) {
+                        case MtpConstants.PROTECTION_STATUS_NON_TRANSFERABLE_DATA:
+                            protectionLevel = "NON_TRANSFERABLE_DATA";
+                            break;
+                        case MtpConstants.PROTECTION_STATUS_READ_ONLY:
+                            protectionLevel = "READ_ONLY";
+                            break;
+                        case MtpConstants.PROTECTION_STATUS_READ_ONLY_DATA:
+                            protectionLevel = "READ_ONLY_DATA";
+                            break;
+                        default:
+                            break;
+                    }
                     String displayString;
                     if (type == MtpConstants.ASSOCIATION_TYPE_GENERIC_FOLDER) {
                         displayString = String.format("目录: %s", fileName);
                     } else {
-                        displayString = String.format(Locale.US, "文件: %s, width: %d, height: %d", fileName, width, height);
+                        displayString = String.format(Locale.US, "文件: %s, width: %d, height: %d 保护：%s", fileName, width, height, protectionLevel);
                     }
 
                     log(displayString);
