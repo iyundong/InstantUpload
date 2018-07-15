@@ -30,6 +30,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.metadata.Metadata;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,6 +65,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
 
     //最后传输的文件名
     String lastFilePath;
+    List<String>lastQueriedHandles;
 
     // 接口
     protected UsbInterface 				intf;
@@ -137,6 +141,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         ((Button) findViewById(R.id.transferObject)).setOnClickListener(this);
         ((Button) findViewById(R.id.getObjectInfo)).setOnClickListener(this);
         ((Button) findViewById(R.id.updateExif)).setOnClickListener(this);
+        findViewById(R.id.readMetaData).setOnClickListener(this);
 
         etPtpObjectName = (EditText) findViewById(R.id.ptpObject);
         etPtpObjectInfoName = (EditText) findViewById(R.id.ptpObjectInfo);
@@ -210,6 +215,9 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
             case R.id.updateExif:
                 updateExif();
                 break;
+            case R.id.readMetaData:
+                readMetaData();
+                break;
         }
     }
 
@@ -278,6 +286,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
                                 strHandleList.add(objectHandle + "");
                             }
                             log(TextUtils.join(",", strHandleList));
+                            lastQueriedHandles = strHandleList;
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -296,42 +305,48 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         try {
             if (isOpenConnected) {
                 final String oh = etPtpObjectInfoName.getText().toString();
-                if (oh.trim() == "") {
-                    log("请输入object handle , 为数字类型");
-                    return;
+                List<String> objectHandlers = new ArrayList<>();
+
+                if (TextUtils.isEmpty(oh.trim())) {
+                    objectHandlers.addAll(lastQueriedHandles);
+                } else {
+                    objectHandlers.add(oh.trim());
                 }
 
                 log("准备获取信息");
 
-                MtpObjectInfo info = mDevice.getObjectInfo(Integer.valueOf(oh));
-                if (info != null) {
-                    String fileName = info.getName();
-                    int height = info.getImagePixHeight();
-                    int width = info.getImagePixWidth();
-                    int type = info.getAssociationType();
-                    int protectionStatus = info.getProtectionStatus();
-                    String protectionLevel = "NONE";
-                    switch (protectionStatus) {
-                        case MtpConstants.PROTECTION_STATUS_NON_TRANSFERABLE_DATA:
-                            protectionLevel = "NON_TRANSFERABLE_DATA";
-                            break;
-                        case MtpConstants.PROTECTION_STATUS_READ_ONLY:
-                            protectionLevel = "READ_ONLY";
-                            break;
-                        case MtpConstants.PROTECTION_STATUS_READ_ONLY_DATA:
-                            protectionLevel = "READ_ONLY_DATA";
-                            break;
-                        default:
-                            break;
-                    }
-                    String displayString;
-                    if (type == MtpConstants.ASSOCIATION_TYPE_GENERIC_FOLDER) {
-                        displayString = String.format("目录: %s", fileName);
-                    } else {
-                        displayString = String.format(Locale.US, "文件: %s, width: %d, height: %d 保护：%s", fileName, width, height, protectionLevel);
-                    }
+                for (String handle : objectHandlers) {
+                    MtpObjectInfo info = mDevice.getObjectInfo(Integer.valueOf(handle));
 
-                    log(displayString);
+                    if (info != null) {
+                        String fileName = info.getName();
+                        int height = info.getImagePixHeight();
+                        int width = info.getImagePixWidth();
+                        int type = info.getAssociationType();
+                        int protectionStatus = info.getProtectionStatus();
+                        String protectionLevel = "NONE";
+                        switch (protectionStatus) {
+                            case MtpConstants.PROTECTION_STATUS_NON_TRANSFERABLE_DATA:
+                                protectionLevel = "NON_TRANSFERABLE_DATA";
+                                break;
+                            case MtpConstants.PROTECTION_STATUS_READ_ONLY:
+                                protectionLevel = "READ_ONLY";
+                                break;
+                            case MtpConstants.PROTECTION_STATUS_READ_ONLY_DATA:
+                                protectionLevel = "READ_ONLY_DATA";
+                                break;
+                            default:
+                                break;
+                        }
+                        String displayString;
+                        if (type == MtpConstants.ASSOCIATION_TYPE_GENERIC_FOLDER) {
+                            displayString = String.format("目录: %s", fileName);
+                        } else {
+                            displayString = String.format(Locale.US, "文件: %s, width: %d, height: %d 保护：%s", fileName, width, height, protectionLevel);
+                        }
+
+                        log(displayString);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -342,7 +357,7 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
     public void transferObject() {
         if (isOpenConnected) {
             final String oh = etPtpObjectName.getText().toString();
-            if (oh.trim() == "") {
+            if (TextUtils.isEmpty(oh.trim())) {
                 log("请输入object handle , 为数字类型");
                 return;
             }
@@ -412,6 +427,12 @@ public class ControllerActivity extends AppCompatActivity implements View.OnClic
         log("update ret value is " + ret);
     }
 
+    //读取图片的元数据
+    private void readMetaData() {
+        log("getExternalFilesDir is " + lastFilePath);
+        String output = MetadataReader.read(lastFilePath);
+        log(output);
+    }
 
     void performConnect(UsbDevice device) {
         if (mClient == null) {

@@ -91,12 +91,17 @@
                         android:hint="对象名称"
                         android:inputType="number" />
                 </LinearLayout>
-
+                <Button
+                    android:id="@+id/readMetaData"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/read_meta_data" />
                 <Button
                     android:id="@+id/updateExif"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/update_exif" />
+
 
             </LinearLayout>
         </ScrollView>

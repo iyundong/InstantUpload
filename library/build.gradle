@@ -31,4 +31,5 @@ dependencies {
     compile 'com.loopj.android:android-async-http:1.4.9'
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:exifinterface:27.1.1'
+    compile 'com.drewnoakes:metadata-extractor:2.11.0'
 }
