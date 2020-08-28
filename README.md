@@ -106,7 +106,7 @@ PTP/USB 是在USB协议技术上, 指令了一组指令集，负责相机和Host
 
 在PTP的定义里面，Host被定义为Initiator, Device被定义为Responder，在PTP协议里面，有下面几个比较重要的概念
 
-Operation : Operation可以理解为一次指令的抽象，所有的Operation 都通过 Initiator 发起，会经过 Operation -> Data Phase -> Response 的一个组合完成一个事物（Transaction)， 其中 Operation 必定由 Initiator 发出到 Responder, Response是Responder -> Initiator 。 Data 的方向既可以是 Initiator -> Responder 也可以是 Responder -> Initiator。 依赖与 Operation 的类型，Host可以定义 Session ，用来为一组 Operation 定义一个统一的上下文环境，除了 Operation 之外， Device 也可以（一般通过 Interrupt Endpoint)发送 Event 给Host，用来传递事件。另外，相机可以通过特定的指令来设置，获取相机的属性（Property）
+Operation : Operation可以理解为一次指令的抽象，所有的Operation 都通过 Initiator 发起，会经过 Operation -> Data Phase -> Response 的一个组合完成一个事务（Transaction)， 其中 Operation 必定由 Initiator 发出到 Responder, Response是Responder -> Initiator 。 Data 的方向既可以是 Initiator -> Responder 也可以是 Responder -> Initiator。 依赖与 Operation 的类型，Host可以定义 Session ，用来为一组 Operation 定义一个统一的上下文环境，除了 Operation 之外， Device 也可以（一般通过 Interrupt Endpoint)发送 Event 给Host，用来传递事件。另外，相机可以通过特定的指令来设置，获取相机的属性（Property）
 
 Object ： PTP协议里面，定义每一个（照片，影像）文件为一个Object, 每一个Object可以对应到一个图片，每一个Object都可以用一个32位的(无符号)整型作为句柄，可以称作 Object Handle。 在PTP协议里规定，在同一个Session里面，同一个文件的Object Handle必须相同，但是一般来说，几乎所有的实现（我目前看到的），即使在不同的Session的情况下，同一个文件的Object Handle也是相同的。
 
